@@ -1,27 +1,35 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentSession, createSession, createTemporaryItem } from '../services/api'
-import type { SessionWithItems } from '../types'
+import { getCurrentSession, createSession, createTemporaryItem, getItems, deleteItem } from '../services/api'
+import type { SessionWithItems, StockItem } from '../types'
+
+type Unit = 'kg' | 'unité(s)'
 
 export function Home() {
   const navigate = useNavigate()
   const [currentSession, setCurrentSession] = useState<SessionWithItems | null>(null)
+  const [temporaryItems, setTemporaryItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [tempItemName, setTempItemName] = useState('')
+  const [tempItemQuantity, setTempItemQuantity] = useState('1')
+  const [tempItemUnit, setTempItemUnit] = useState<Unit>('unité(s)')
   const [addingItem, setAddingItem] = useState(false)
-  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null)
 
   useEffect(() => {
-    loadSession()
+    loadData()
   }, [])
 
-  async function loadSession() {
+  async function loadData() {
     try {
-      const session = await getCurrentSession()
+      const [session, items] = await Promise.all([
+        getCurrentSession(),
+        getItems(),
+      ])
       setCurrentSession(session)
+      setTemporaryItems(items.filter(i => i.isTemporary))
     } catch (error) {
-      console.error('Failed to load session:', error)
+      console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
     }
@@ -29,7 +37,6 @@ export function Home() {
 
   const handleNewSession = async () => {
     if (currentSession) {
-      // Navigate to existing session
       if (currentSession.status === 'pre-shopping') {
         navigate('/pre-shopping')
       } else {
@@ -54,20 +61,32 @@ export function Home() {
     e.preventDefault()
     if (!tempItemName.trim() || addingItem) return
 
+    const quantity = parseFloat(tempItemQuantity) || 1
+
     setAddingItem(true)
     try {
-      await createTemporaryItem(tempItemName.trim())
-      setRecentlyAdded(tempItemName.trim())
+      const item = await createTemporaryItem(tempItemName.trim(), quantity, tempItemUnit)
+      setTemporaryItems(prev => [...prev, item])
       setTempItemName('')
+      setTempItemQuantity('1')
+      setTempItemUnit('unité(s)')
       // Reload session to get updated items
-      await loadSession()
-      // Clear the "added" message after 2 seconds
-      setTimeout(() => setRecentlyAdded(null), 2000)
+      const session = await getCurrentSession()
+      setCurrentSession(session)
     } catch (error) {
       console.error('Failed to add temporary item:', error)
       alert('Erreur lors de l\'ajout')
     } finally {
       setAddingItem(false)
+    }
+  }
+
+  const handleDeleteTemporaryItem = async (id: string) => {
+    try {
+      await deleteItem(id)
+      setTemporaryItems(prev => prev.filter(i => i.id !== id))
+    } catch (error) {
+      console.error('Failed to delete item:', error)
     }
   }
 
@@ -81,39 +100,6 @@ export function Home() {
 
   return (
     <div className="space-y-6">
-      {/* Quick add temporary item */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 className="text-sm font-medium text-gray-700 mb-2">Ajouter pour cette fois</h2>
-        <form onSubmit={handleAddTemporaryItem} className="flex gap-2">
-          <input
-            type="text"
-            value={tempItemName}
-            onChange={(e) => setTempItemName(e.target.value)}
-            placeholder="Ex: Ampoules, Piles..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-          />
-          <button
-            type="submit"
-            disabled={!tempItemName.trim() || addingItem}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            {addingItem ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            )}
-          </button>
-        </form>
-        {recentlyAdded && (
-          <p className="text-sm text-green-600 mt-2">"{recentlyAdded}" ajouté</p>
-        )}
-        <p className="text-xs text-gray-500 mt-2">
-          Cet article sera supprimé après la session de courses
-        </p>
-      </div>
-
       {/* Session actions */}
       <div className="space-y-4">
         <button
@@ -156,6 +142,96 @@ export function Home() {
           </svg>
           Gérer les éléments
         </button>
+      </div>
+
+      {/* Temporary items section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h2 className="text-sm font-medium text-gray-700 mb-3">Ajouter pour cette fois</h2>
+        
+        {/* List of temporary items */}
+        {temporaryItems.length > 0 && (
+          <div className="mb-4 divide-y divide-gray-100">
+            {temporaryItems.map(item => (
+              <div key={item.id} className="flex items-center justify-between py-2">
+                <span className="text-gray-900">{item.name}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500">
+                    {item.targetQuantity} {item.unit}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteTemporaryItem(item.id)}
+                    className="text-gray-400 hover:text-red-600 p-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add form */}
+        <form onSubmit={handleAddTemporaryItem} className="space-y-3">
+          <input
+            type="text"
+            value={tempItemName}
+            onChange={(e) => setTempItemName(e.target.value)}
+            placeholder="Ex: Ampoules, Piles..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+          />
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={tempItemQuantity}
+              onChange={(e) => setTempItemQuantity(e.target.value)}
+              min="0.1"
+              step="0.1"
+              className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base text-center"
+            />
+            <div className="flex-1 flex rounded-lg border border-gray-300 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTempItemUnit('unité(s)')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  tempItemUnit === 'unité(s)'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                unité(s)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTempItemUnit('kg')}
+                className={`flex-1 py-2 text-sm font-medium transition-colors border-l border-gray-300 ${
+                  tempItemUnit === 'kg'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                kg
+              </button>
+            </div>
+            <button
+              type="submit"
+              disabled={!tempItemName.trim() || addingItem}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {addingItem ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </form>
+        <p className="text-xs text-gray-500 mt-3">
+          Ces articles seront supprimés après la session de courses
+        </p>
       </div>
     </div>
   )

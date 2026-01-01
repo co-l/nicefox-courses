@@ -104,7 +104,7 @@ router.post('/reorder', async (req: Request, res: Response) => {
 // POST /api/items/temporary - Create temporary item and add to current session
 router.post('/temporary', async (req: Request, res: Response) => {
   try {
-    const { name, quantity = 1 } = req.body as { name: string; quantity?: number }
+    const { name, quantity = 1, unit = 'unité(s)' } = req.body as { name: string; quantity?: number; unit?: string }
     
     if (!name || typeof name !== 'string' || name.trim() === '') {
       res.status(400).json({ error: 'name is required' })
@@ -115,7 +115,7 @@ router.post('/temporary', async (req: Request, res: Response) => {
     const item = await itemService.createItem(req.stockUser!.id, {
       name: name.trim(),
       targetQuantity: quantity,
-      unit: 'pcs',
+      unit,
       isTemporary: true,
     })
 
