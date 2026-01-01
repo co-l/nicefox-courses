@@ -39,7 +39,23 @@ export function PreShopping() {
 
   async function handleQuantityChange(item: StockSessionItem, value: string) {
     const qty = value === '' ? null : parseFloat(value)
-    
+    await updateQuantity(item, qty)
+  }
+
+  async function handleIncrement(item: StockSessionItem) {
+    const currentQty = item.countedQuantity ?? 0
+    const step = item.item.unit === 'kg' ? 0.5 : 1
+    await updateQuantity(item, currentQty + step)
+  }
+
+  async function handleDecrement(item: StockSessionItem) {
+    const currentQty = item.countedQuantity ?? 0
+    const step = item.item.unit === 'kg' ? 0.5 : 1
+    const newQty = Math.max(0, currentQty - step)
+    await updateQuantity(item, newQty)
+  }
+
+  async function updateQuantity(item: StockSessionItem, qty: number | null) {
     // Optimistic update
     setSession((prev) => {
       if (!prev) return prev
@@ -149,22 +165,34 @@ export function PreShopping() {
                 </h2>
                 <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
                   {items.map((item) => (
-                    <div key={item.id} className="p-3 flex items-center gap-3">
+                    <div key={item.id} className="p-3 flex items-center gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{item.item.name}</div>
+                        <div className="text-xs text-gray-500">
+                          objectif: {item.item.targetQuantity} {item.item.unit}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDecrement(item)}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
+                        >
+                          -
+                        </button>
                         <input
                           type="number"
                           min="0"
                           step="0.1"
                           value={item.countedQuantity ?? 0}
                           onChange={(e) => handleQuantityChange(item, e.target.value)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-14 h-10 px-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
-                        <span className="text-gray-500 text-sm whitespace-nowrap">
-                          / {item.item.targetQuantity} {item.item.unit}
-                        </span>
+                        <button
+                          onClick={() => handleIncrement(item)}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                   ))}
