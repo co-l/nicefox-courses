@@ -38,3 +38,11 @@ export async function updateSessionItem(
 export async function completeSession(id: string, userId: string): Promise<StockSession | null> {
   return sessionQueries.completeSession(id, userId)
 }
+
+export async function addSessionItemForItem(
+  userId: string,
+  itemId: string,
+  quantity: number
+) {
+  return sessionQueries.addSessionItemForItem(userId, itemId, quantity)
+}

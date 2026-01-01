@@ -45,7 +45,7 @@ export async function createItem(userId: string, data: CreateItemRequest): Promi
   const now = new Date().toISOString()
 
   const result = await db.query<{ i: NodeResult<StockItem> }>(
-    `CREATE (i:Stock_Item {id: $id, userId: $userId, name: $name, targetQuantity: $targetQuantity, currentQuantity: $currentQuantity, unit: $unit, homeLocation: $homeLocation, homeOrder: $homeOrder, storeSection: $storeSection, storeOrder: $storeOrder, createdAt: $now, updatedAt: $now}) RETURN i`,
+    `CREATE (i:Stock_Item {id: $id, userId: $userId, name: $name, targetQuantity: $targetQuantity, currentQuantity: $currentQuantity, unit: $unit, homeLocation: $homeLocation, homeOrder: $homeOrder, storeSection: $storeSection, storeOrder: $storeOrder, isTemporary: $isTemporary, createdAt: $now, updatedAt: $now}) RETURN i`,
     {
       id,
       userId,
@@ -57,6 +57,7 @@ export async function createItem(userId: string, data: CreateItemRequest): Promi
       homeOrder,
       storeSection: data.storeSection || '',
       storeOrder,
+      isTemporary: data.isTemporary ?? false,
       now,
     }
   )
@@ -133,5 +134,21 @@ export async function reorderItems(
     if (Object.keys(updates).length > 0) {
       await updateItem(item.id, userId, updates)
     }
+  }
+}
+
+export async function deleteTemporaryItems(userId: string): Promise<void> {
+  // Get all temporary items first (can't filter in WHERE)
+  const result = await db.query<{ i: NodeResult<StockItem> }>(
+    `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
+    { userId }
+  )
+  const temporaryItems = result.filter(r => r.i.properties.isTemporary === true)
+  
+  for (const { i } of temporaryItems) {
+    await db.execute(
+      `MATCH (i:Stock_Item {id: $id}) DETACH DELETE i`,
+      { id: i.properties.id }
+    )
   }
 }

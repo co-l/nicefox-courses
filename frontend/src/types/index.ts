@@ -15,6 +15,7 @@ export interface StockItem {
   homeOrder: number
   storeSection: string
   storeOrder: number
+  isTemporary: boolean
   createdAt: string
   updatedAt: string
 }

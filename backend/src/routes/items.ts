@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import * as itemService from '../services/item.js'
+import * as sessionService from '../services/session.js'
 import type { CreateItemRequest, UpdateItemRequest, ReorderItemsRequest } from '../types/index.js'
 
 const router = Router()
@@ -97,6 +98,34 @@ router.post('/reorder', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to reorder items:', error)
     res.status(500).json({ error: 'Failed to reorder items' })
+  }
+})
+
+// POST /api/items/temporary - Create temporary item and add to current session
+router.post('/temporary', async (req: Request, res: Response) => {
+  try {
+    const { name, quantity = 1 } = req.body as { name: string; quantity?: number }
+    
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      res.status(400).json({ error: 'name is required' })
+      return
+    }
+
+    // Create temporary item
+    const item = await itemService.createItem(req.stockUser!.id, {
+      name: name.trim(),
+      targetQuantity: quantity,
+      unit: 'pcs',
+      isTemporary: true,
+    })
+
+    // Add to current session if one exists
+    await sessionService.addSessionItemForItem(req.stockUser!.id, item.id, quantity)
+
+    res.status(201).json(item)
+  } catch (error) {
+    console.error('Failed to create temporary item:', error)
+    res.status(500).json({ error: 'Failed to create temporary item' })
   }
 })
 

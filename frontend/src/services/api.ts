@@ -68,6 +68,11 @@ export async function reorderItems(
   await api.post('/items/reorder', { items })
 }
 
+export async function createTemporaryItem(name: string, quantity: number = 1): Promise<StockItem> {
+  const { data } = await api.post('/items/temporary', { name, quantity })
+  return data
+}
+
 // Sessions
 export async function getCurrentSession(): Promise<SessionWithItems | null> {
   try {

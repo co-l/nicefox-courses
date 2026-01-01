@@ -31,6 +31,7 @@ export interface StockItem {
   homeOrder: number
   storeSection: string
   storeOrder: number
+  isTemporary: boolean
   createdAt: string
   updatedAt: string
 }
@@ -58,8 +59,9 @@ export interface CreateItemRequest {
   targetQuantity: number
   currentQuantity?: number
   unit: string
-  homeLocation: string
-  storeSection: string
+  homeLocation?: string
+  storeSection?: string
+  isTemporary?: boolean
 }
 
 export interface UpdateItemRequest {

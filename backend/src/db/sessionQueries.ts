@@ -1,6 +1,7 @@
 import { db } from './graphdb.js'
 import { v4 as uuidv4 } from 'uuid'
 import type { StockSession, StockSessionItem, StockItem } from '../types/index.js'
+import { deleteTemporaryItems } from './itemQueries.js'
 
 interface NodeResult<T> {
   id: string
@@ -212,6 +213,9 @@ export async function completeSession(id: string, userId: string): Promise<Stock
     { id, userId, now }
   )
 
+  // Delete temporary items after session completion
+  await deleteTemporaryItems(userId)
+
   return result[0]?.s?.properties || null
 }
 
@@ -221,4 +225,33 @@ export async function hasActiveSession(userId: string): Promise<boolean> {
     { userId }
   )
   return allSessions.some(r => r.s.properties.status !== 'completed')
+}
+
+export async function addSessionItemForItem(
+  userId: string,
+  itemId: string,
+  quantity: number
+): Promise<StockSessionItem | null> {
+  // Find active session
+  const allSessions = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {userId: $userId}) RETURN s`,
+    { userId }
+  )
+  const activeSession = allSessions.find(r => r.s.properties.status !== 'completed')
+  if (!activeSession) return null
+
+  const sessionId = activeSession.s.properties.id
+  const sessionItemId = uuidv4()
+
+  await db.execute(
+    `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, countedQuantity: 0, toBuy: $toBuy, purchased: false})`,
+    { id: sessionItemId, sessionId, itemId, toBuy: quantity }
+  )
+
+  const result = await db.query<{ si: NodeResult<StockSessionItem> }>(
+    `MATCH (si:Stock_SessionItem {id: $id}) RETURN si`,
+    { id: sessionItemId }
+  )
+
+  return result[0]?.si?.properties || null
 }
