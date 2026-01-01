@@ -16,7 +16,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession, reorderSessionItems } from '../services/api'
+import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession, reorderItems } from '../services/api'
 import type { SessionWithItems, StockSessionItem } from '../types'
 import { SortableShoppingItem } from '../components/SortableShoppingItem'
 
@@ -97,19 +97,22 @@ export function Shopping() {
     const { active, over } = event
     if (!over || active.id === over.id || !session) return
 
-    const itemsToBuy = session.items
+    const currentItemsToBuy = session.items
       .filter((i) => i.toBuy > 0)
-      .sort((a, b) => (a.shoppingOrder ?? 0) - (b.shoppingOrder ?? 0))
+      .sort((a, b) => a.item.storeOrder - b.item.storeOrder)
 
-    const oldIndex = itemsToBuy.findIndex((item) => item.itemId === active.id)
-    const newIndex = itemsToBuy.findIndex((item) => item.itemId === over.id)
+    const oldIndex = currentItemsToBuy.findIndex((item) => item.itemId === active.id)
+    const newIndex = currentItemsToBuy.findIndex((item) => item.itemId === over.id)
 
-    const reorderedItems = arrayMove(itemsToBuy, oldIndex, newIndex)
+    const reorderedItems = arrayMove(currentItemsToBuy, oldIndex, newIndex)
 
-    // Update local state optimistically
-    const updatedItems = reorderedItems.map((item, index) => ({
-      ...item,
-      shoppingOrder: index,
+    // Update local state optimistically - update storeOrder on the item
+    const updatedSessionItems = reorderedItems.map((sessionItem, index) => ({
+      ...sessionItem,
+      item: {
+        ...sessionItem.item,
+        storeOrder: index,
+      },
     }))
 
     setSession((prev) => {
@@ -117,17 +120,16 @@ export function Shopping() {
       const otherItems = prev.items.filter((i) => i.toBuy <= 0)
       return {
         ...prev,
-        items: [...updatedItems, ...otherItems],
+        items: [...updatedSessionItems, ...otherItems],
       }
     })
 
-    // Persist to server
+    // Persist to server - update storeOrder on items
     try {
-      await reorderSessionItems(
-        session.id,
-        updatedItems.map((item) => ({
-          itemId: item.itemId,
-          shoppingOrder: item.shoppingOrder,
+      await reorderItems(
+        updatedSessionItems.map((sessionItem) => ({
+          id: sessionItem.itemId,
+          storeOrder: sessionItem.item.storeOrder,
         }))
       )
     } catch (error) {
@@ -172,10 +174,10 @@ export function Shopping() {
     return null
   }
 
-  // Filter items with toBuy > 0, sorted by shoppingOrder
+  // Filter items with toBuy > 0, sorted by storeOrder
   const itemsToBuy = session.items
     .filter((i) => i.toBuy > 0)
-    .sort((a, b) => (a.shoppingOrder ?? 0) - (b.shoppingOrder ?? 0))
+    .sort((a, b) => a.item.storeOrder - b.item.storeOrder)
 
   const purchasedCount = itemsToBuy.filter((i) => i.purchased).length
   const totalCount = itemsToBuy.length

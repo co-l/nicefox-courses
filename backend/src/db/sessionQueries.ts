@@ -99,18 +99,12 @@ export async function createSession(userId: string): Promise<SessionWithItems> {
   )
 
   // Create session items for each item (countedQuantity defaults to 0, toBuy = targetQuantity)
-  // Sort by storeOrder so shoppingOrder starts in a logical order
-  const sortedItems = itemsResult
-    .map(r => r.i.properties)
-    .sort((a, b) => a.storeOrder - b.storeOrder)
-  
-  for (let idx = 0; idx < sortedItems.length; idx++) {
-    const item = sortedItems[idx]
+  for (const { i } of itemsResult) {
     const sessionItemId = uuidv4()
-    const toBuy = item.targetQuantity || 0
+    const toBuy = i.properties.targetQuantity || 0
     await db.execute(
-      `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, countedQuantity: 0, toBuy: $toBuy, purchased: false, shoppingOrder: $shoppingOrder})`,
-      { id: sessionItemId, sessionId, itemId: item.id, toBuy, shoppingOrder: idx }
+      `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, countedQuantity: 0, toBuy: $toBuy, purchased: false})`,
+      { id: sessionItemId, sessionId, itemId: i.properties.id, toBuy }
     )
   }
 
@@ -227,27 +221,4 @@ export async function hasActiveSession(userId: string): Promise<boolean> {
     { userId }
   )
   return allSessions.some(r => r.s.properties.status !== 'completed')
-}
-
-export async function reorderSessionItems(
-  sessionId: string,
-  userId: string,
-  items: { itemId: string; shoppingOrder: number }[]
-): Promise<boolean> {
-  // Verify session belongs to user
-  const sessionCheck = await db.query<{ s: NodeResult<StockSession> }>(
-    `MATCH (s:Stock_Session {id: $sessionId, userId: $userId}) RETURN s`,
-    { sessionId, userId }
-  )
-  if (!sessionCheck[0]) return false
-
-  // Update each item's shoppingOrder
-  for (const { itemId, shoppingOrder } of items) {
-    await db.execute(
-      `MATCH (si:Stock_SessionItem {sessionId: $sessionId, itemId: $itemId}) SET si.shoppingOrder = $shoppingOrder`,
-      { sessionId, itemId, shoppingOrder }
-    )
-  }
-
-  return true
 }
