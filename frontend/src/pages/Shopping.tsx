@@ -114,6 +114,17 @@ export function Shopping() {
 
   return (
     <div>
+      <button
+        onClick={handleGoBack}
+        disabled={goingBack}
+        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+      >
+        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Inventaire
+      </button>
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Liste de courses</h1>
         <span className="text-sm font-medium text-gray-600">

@@ -11,6 +11,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const isHome = location.pathname === '/'
+  const isShopping = location.pathname === '/shopping'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,7 +37,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
       <main className="max-w-lg mx-auto px-4 py-6">
-        {!isHome && (
+        {!isHome && !isShopping && (
           <Link
             to="/"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
