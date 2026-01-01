@@ -146,7 +146,7 @@ export function Home() {
 
       {/* Temporary items section */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">Ajouter pour cette fois</h2>
+        <h2 className="text-sm font-medium text-gray-700 mb-3">Ajouter pour les prochaines courses</h2>
         
         {/* List of temporary items */}
         {temporaryItems.length > 0 && (
