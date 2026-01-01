@@ -50,6 +50,7 @@ export interface StockSessionItem {
   countedQuantity: number | null
   toBuy: number
   purchased: boolean
+  shoppingOrder: number
 }
 
 // API request/response types
@@ -80,6 +81,11 @@ export interface ReorderItemsRequest {
 export interface UpdateSessionItemRequest {
   countedQuantity?: number | null
   purchased?: boolean
+  shoppingOrder?: number
+}
+
+export interface ReorderSessionItemsRequest {
+  items: { itemId: string; shoppingOrder: number }[]
 }
 
 // Extend Express Request

@@ -112,3 +112,10 @@ export async function completeSession(id: string): Promise<StockSession> {
   const { data } = await api.post(`/sessions/${id}/complete`)
   return data
 }
+
+export async function reorderSessionItems(
+  sessionId: string,
+  items: { itemId: string; shoppingOrder: number }[]
+): Promise<void> {
+  await api.post(`/sessions/${sessionId}/reorder`, { items })
+}

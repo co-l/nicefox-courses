@@ -38,3 +38,11 @@ export async function updateSessionItem(
 export async function completeSession(id: string, userId: string): Promise<StockSession | null> {
   return sessionQueries.completeSession(id, userId)
 }
+
+export async function reorderSessionItems(
+  sessionId: string,
+  userId: string,
+  items: { itemId: string; shoppingOrder: number }[]
+): Promise<boolean> {
+  return sessionQueries.reorderSessionItems(sessionId, userId, items)
+}

@@ -1,7 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession } from '../services/api'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession, reorderSessionItems } from '../services/api'
 import type { SessionWithItems, StockSessionItem } from '../types'
+import { SortableShoppingItem } from '../components/SortableShoppingItem'
 
 export function Shopping() {
   const navigate = useNavigate()
@@ -9,6 +26,24 @@ export function Shopping() {
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(false)
   const [goingBack, setGoingBack] = useState(false)
+
+  // Sensors optimized for mobile touch
+  const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
+      },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadSession()
@@ -58,6 +93,49 @@ export function Shopping() {
     }
   }
 
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id || !session) return
+
+    const itemsToBuy = session.items
+      .filter((i) => i.toBuy > 0)
+      .sort((a, b) => (a.shoppingOrder ?? 0) - (b.shoppingOrder ?? 0))
+
+    const oldIndex = itemsToBuy.findIndex((item) => item.itemId === active.id)
+    const newIndex = itemsToBuy.findIndex((item) => item.itemId === over.id)
+
+    const reorderedItems = arrayMove(itemsToBuy, oldIndex, newIndex)
+
+    // Update local state optimistically
+    const updatedItems = reorderedItems.map((item, index) => ({
+      ...item,
+      shoppingOrder: index,
+    }))
+
+    setSession((prev) => {
+      if (!prev) return prev
+      const otherItems = prev.items.filter((i) => i.toBuy <= 0)
+      return {
+        ...prev,
+        items: [...updatedItems, ...otherItems],
+      }
+    })
+
+    // Persist to server
+    try {
+      await reorderSessionItems(
+        session.id,
+        updatedItems.map((item) => ({
+          itemId: item.itemId,
+          shoppingOrder: item.shoppingOrder,
+        }))
+      )
+    } catch (error) {
+      console.error('Failed to reorder items:', error)
+      loadSession()
+    }
+  }
+
   async function handleGoBack() {
     if (!session) return
     setGoingBack(true)
@@ -94,20 +172,10 @@ export function Shopping() {
     return null
   }
 
-  // Filter items with toBuy > 0, sorted by storeOrder
+  // Filter items with toBuy > 0, sorted by shoppingOrder
   const itemsToBuy = session.items
     .filter((i) => i.toBuy > 0)
-    .sort((a, b) => a.item.storeOrder - b.item.storeOrder)
-
-  // Group by storeSection
-  const groupedItems = itemsToBuy.reduce((acc, item) => {
-    const section = item.item.storeSection
-    if (!acc[section]) {
-      acc[section] = []
-    }
-    acc[section].push(item)
-    return acc
-  }, {} as Record<string, StockSessionItem[]>)
+    .sort((a, b) => (a.shoppingOrder ?? 0) - (b.shoppingOrder ?? 0))
 
   const purchasedCount = itemsToBuy.filter((i) => i.purchased).length
   const totalCount = itemsToBuy.length
@@ -128,7 +196,7 @@ export function Shopping() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Liste de courses</h1>
         <span className="text-sm font-medium text-gray-600">
-          {purchasedCount}/{totalCount} ✓
+          {purchasedCount}/{totalCount}
         </span>
       </div>
 
@@ -146,82 +214,45 @@ export function Shopping() {
         </div>
       ) : (
         <>
-          <div className="space-y-6 mb-6">
-            {Object.entries(groupedItems).map(([section, items]) => (
-              <div key={section}>
-                <h2 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                  <span className="text-lg">🛒</span>
-                  {section}
-                </h2>
-                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
-                  {items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTogglePurchased(item)}
-                      className="w-full p-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors"
-                    >
-                      <div
-                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                          item.purchased
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300'
-                        }`}
-                      >
-                        {item.purchased && (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className={item.purchased ? 'line-through text-gray-400' : ''}>
-                          {item.item.name}
-                        </span>
-                      </div>
-                      <span className={`text-sm ${item.purchased ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {item.toBuy} {item.item.unit}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+          <p className="text-xs text-gray-500 mb-2">Maintenez et glissez pour réordonner</p>
+          
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={itemsToBuy.map((i) => i.itemId)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 mb-6">
+                {itemsToBuy.map((item) => (
+                  <SortableShoppingItem
+                    key={item.itemId}
+                    item={item}
+                    onTogglePurchased={() => handleTogglePurchased(item)}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleGoBack}
-              disabled={goingBack || completing}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              {goingBack ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Inventaire
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleComplete}
-              disabled={completing || goingBack}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              {completing ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Terminer
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleComplete}
+            disabled={completing || goingBack}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {completing ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Terminer
+              </>
+            )}
+          </button>
         </>
       )}
     </div>

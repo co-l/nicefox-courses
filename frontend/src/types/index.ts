@@ -34,6 +34,7 @@ export interface StockSessionItem {
   countedQuantity: number | null
   toBuy: number
   purchased: boolean
+  shoppingOrder: number
   item: StockItem
 }
 

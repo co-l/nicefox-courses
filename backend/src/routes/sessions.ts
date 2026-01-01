@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import * as sessionService from '../services/session.js'
-import type { UpdateSessionItemRequest, StockSession } from '../types/index.js'
+import type { UpdateSessionItemRequest, ReorderSessionItemsRequest, StockSession } from '../types/index.js'
 
 const router = Router()
 
@@ -104,6 +104,34 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to complete session:', error)
     res.status(500).json({ error: 'Failed to complete session' })
+  }
+})
+
+// POST /api/sessions/:id/reorder - Reorder session items
+router.post('/:id/reorder', async (req: Request, res: Response) => {
+  try {
+    const { items } = req.body as ReorderSessionItemsRequest
+    
+    if (!Array.isArray(items)) {
+      res.status(400).json({ error: 'items must be an array' })
+      return
+    }
+
+    const success = await sessionService.reorderSessionItems(
+      req.params.id,
+      req.stockUser!.id,
+      items
+    )
+    
+    if (!success) {
+      res.status(404).json({ error: 'Session not found' })
+      return
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Failed to reorder session items:', error)
+    res.status(500).json({ error: 'Failed to reorder session items' })
   }
 })
 
