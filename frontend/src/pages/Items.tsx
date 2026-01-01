@@ -90,9 +90,22 @@ export function Items() {
     if (!confirm('Supprimer cet élément ?')) return
     try {
       await deleteItem(id)
-      setItems(items.filter((item) => item.id !== id))
+      setItems(prev => prev.filter((item) => item.id !== id))
     } catch (error) {
       console.error('Failed to delete item:', error)
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (!confirm(`Supprimer les ${items.length} éléments ?`)) return
+    try {
+      for (const item of items) {
+        await deleteItem(item.id)
+      }
+      setItems([])
+    } catch (error) {
+      console.error('Failed to delete all items:', error)
+      loadItems()
     }
   }
 
@@ -108,15 +121,37 @@ export function Items() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Éléments</h1>
-        <button
-          onClick={() => navigate('/items/new')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Ajouter
-        </button>
+        <div className="flex gap-2">
+          {items.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              className="bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2 px-3 rounded-lg transition-colors"
+              title="Tout supprimer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/items/import')}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-3 rounded-lg transition-colors"
+            title="Importer CSV"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+          </button>
+          <button
+            onClick={() => navigate('/items/new')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Ajouter
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4">

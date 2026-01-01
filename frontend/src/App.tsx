@@ -5,6 +5,7 @@ import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
 import { Items } from './pages/Items'
 import { ItemForm } from './pages/ItemForm'
+import { ImportCSV } from './pages/ImportCSV'
 import { PreShopping } from './pages/PreShopping'
 import { Shopping } from './pages/Shopping'
 
@@ -19,6 +20,7 @@ function App() {
               <Route path="/items" element={<Items />} />
               <Route path="/items/new" element={<ItemForm />} />
               <Route path="/items/:id" element={<ItemForm />} />
+              <Route path="/items/import" element={<ImportCSV />} />
               <Route path="/pre-shopping" element={<PreShopping />} />
               <Route path="/shopping" element={<Shopping />} />
             </Routes>

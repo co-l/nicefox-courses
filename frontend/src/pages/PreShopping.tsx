@@ -139,39 +139,59 @@ export function PreShopping() {
           </button>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedItems).map(([location, items]) => (
-            <div key={location}>
-              <h2 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                <span className="text-lg">📍</span>
-                {location}
-              </h2>
-              <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
-                {items.map((item) => (
-                  <div key={item.id} className="p-3 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{item.item.name}</div>
+        <>
+          <div className="space-y-6">
+            {Object.entries(groupedItems).map(([location, items]) => (
+              <div key={location}>
+                <h2 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <span className="text-lg">📍</span>
+                  {location || 'Non classé'}
+                </h2>
+                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {items.map((item) => (
+                    <div key={item.id} className="p-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{item.item.name}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={item.countedQuantity ?? 0}
+                          onChange={(e) => handleQuantityChange(item, e.target.value)}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <span className="text-gray-500 text-sm whitespace-nowrap">
+                          / {item.item.targetQuantity} {item.item.unit}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.countedQuantity ?? ''}
-                        onChange={(e) => handleQuantityChange(item, e.target.value)}
-                        placeholder="0"
-                        className="w-16 px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <span className="text-gray-500 text-sm whitespace-nowrap">
-                        / {item.item.targetQuantity} {item.item.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={handleContinue}
+              disabled={transitioning}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {transitioning ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  Continuer vers les courses
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

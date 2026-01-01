@@ -53,9 +53,9 @@ export async function createItem(userId: string, data: CreateItemRequest): Promi
       targetQuantity: data.targetQuantity,
       currentQuantity: data.currentQuantity ?? 0,
       unit: data.unit,
-      homeLocation: data.homeLocation,
+      homeLocation: data.homeLocation || '',
       homeOrder,
-      storeSection: data.storeSection,
+      storeSection: data.storeSection || '',
       storeOrder,
       now,
     }
@@ -111,13 +111,15 @@ export async function updateItem(id: string, userId: string, data: UpdateItemReq
 }
 
 export async function deleteItem(id: string, userId: string): Promise<boolean> {
-  const result = await db.query<{ count: number }>(
-    `MATCH (i:Stock_Item {id: $id, userId: $userId})
-     DETACH DELETE i
-     RETURN count(i) AS count`,
+  // Check if item exists first
+  const existing = await findItemById(id, userId)
+  if (!existing) return false
+  
+  await db.execute(
+    `MATCH (i:Stock_Item {id: $id, userId: $userId}) DETACH DELETE i`,
     { id, userId }
   )
-  return (result[0]?.count ?? 0) > 0
+  return true
 }
 
 export async function reorderItems(

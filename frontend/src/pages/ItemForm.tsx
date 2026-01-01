@@ -15,8 +15,6 @@ export function ItemForm() {
     targetQuantity: 1,
     currentQuantity: 0,
     unit: '',
-    homeLocation: '',
-    storeSection: '',
   })
 
   useEffect(() => {
@@ -33,8 +31,6 @@ export function ItemForm() {
         targetQuantity: item.targetQuantity,
         currentQuantity: item.currentQuantity,
         unit: item.unit,
-        homeLocation: item.homeLocation,
-        storeSection: item.storeSection,
       })
     } catch (error) {
       console.error('Failed to load item:', error)
@@ -129,33 +125,7 @@ export function ItemForm() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Emplacement maison
-          </label>
-          <input
-            type="text"
-            required
-            value={form.homeLocation}
-            onChange={(e) => setForm({ ...form, homeLocation: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Ex: Réfrigérateur"
-          />
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Rayon magasin
-          </label>
-          <input
-            type="text"
-            required
-            value={form.storeSection}
-            onChange={(e) => setForm({ ...form, storeSection: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Ex: Fruits et légumes"
-          />
-        </div>
 
         {isEditing && (
           <div>

@@ -98,12 +98,13 @@ export async function createSession(userId: string): Promise<SessionWithItems> {
     { userId }
   )
 
-  // Create session items for each item
+  // Create session items for each item (countedQuantity defaults to 0, toBuy = targetQuantity)
   for (const { i } of itemsResult) {
     const sessionItemId = uuidv4()
+    const toBuy = i.properties.targetQuantity || 0
     await db.execute(
-      `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, toBuy: 0, purchased: false})`,
-      { id: sessionItemId, sessionId, itemId: i.properties.id }
+      `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, countedQuantity: 0, toBuy: $toBuy, purchased: false})`,
+      { id: sessionItemId, sessionId, itemId: i.properties.id, toBuy }
     )
   }
 
@@ -191,10 +192,18 @@ export async function completeSession(id: string, userId: string): Promise<Stock
   // Update each item's currentQuantity
   const now = new Date().toISOString()
   for (const { si } of purchasedItems) {
-    await db.execute(
-      `MATCH (i:Stock_Item {id: $itemId}) SET i.currentQuantity = i.currentQuantity + $toBuy, i.updatedAt = $now`,
-      { itemId: si.properties.itemId, toBuy: si.properties.toBuy, now }
+    // Get current quantity first
+    const itemResult = await db.query<{ i: NodeResult<StockItem> }>(
+      `MATCH (i:Stock_Item {id: $itemId}) RETURN i`,
+      { itemId: si.properties.itemId }
     )
+    if (itemResult[0]) {
+      const newQuantity = (itemResult[0].i.properties.currentQuantity || 0) + si.properties.toBuy
+      await db.execute(
+        `MATCH (i:Stock_Item {id: $itemId}) SET i.currentQuantity = $newQuantity, i.updatedAt = $now`,
+        { itemId: si.properties.itemId, newQuantity, now }
+      )
+    }
   }
 
   // Mark session as completed

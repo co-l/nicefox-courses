@@ -46,8 +46,8 @@ export interface CreateItemRequest {
   targetQuantity: number
   currentQuantity?: number
   unit: string
-  homeLocation: string
-  storeSection: string
+  homeLocation?: string
+  storeSection?: string
 }
 
 export interface UpdateItemRequest {

@@ -36,8 +36,8 @@ router.post('/', async (req: Request, res: Response) => {
     const data: CreateItemRequest = req.body
     
     // Validation
-    if (!data.name || !data.unit || !data.homeLocation || !data.storeSection) {
-      res.status(400).json({ error: 'Missing required fields: name, unit, homeLocation, storeSection' })
+    if (!data.name || !data.unit) {
+      res.status(400).json({ error: 'Missing required fields: name, unit' })
       return
     }
     if (typeof data.targetQuantity !== 'number' || data.targetQuantity < 0) {

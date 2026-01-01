@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentSession, updateSessionItem, completeSession } from '../services/api'
+import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession } from '../services/api'
 import type { SessionWithItems, StockSessionItem } from '../types'
 
 export function Shopping() {
@@ -8,6 +8,7 @@ export function Shopping() {
   const [session, setSession] = useState<SessionWithItems | null>(null)
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(false)
+  const [goingBack, setGoingBack] = useState(false)
 
   useEffect(() => {
     loadSession()
@@ -54,6 +55,18 @@ export function Shopping() {
     } catch (error) {
       console.error('Failed to update item:', error)
       loadSession()
+    }
+  }
+
+  async function handleGoBack() {
+    if (!session) return
+    setGoingBack(true)
+    try {
+      await updateSessionStatus(session.id, 'pre-shopping')
+      navigate('/pre-shopping')
+    } catch (error) {
+      console.error('Failed to go back:', error)
+      setGoingBack(false)
     }
   }
 
@@ -164,22 +177,40 @@ export function Shopping() {
             ))}
           </div>
 
-          <button
-            onClick={handleComplete}
-            disabled={completing}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            {completing ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Terminer
-              </>
-            )}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleGoBack}
+              disabled={goingBack || completing}
+              className="flex-1 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {goingBack ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-500"></div>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Inventaire
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleComplete}
+              disabled={completing || goingBack}
+              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {completing ? (
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Terminer
+                </>
+              )}
+            </button>
+          </div>
         </>
       )}
     </div>
