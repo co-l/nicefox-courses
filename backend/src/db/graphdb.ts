@@ -1,4 +1,4 @@
-import { NiceFoxGraphDB } from 'nicefox-graphdb/packages/client/src/index.js'
+import { NiceFoxGraphDB } from 'nicefox-graphdb/packages/client/dist/index.js'
 import { config } from '../config.js'
 
 export const db = new NiceFoxGraphDB({
