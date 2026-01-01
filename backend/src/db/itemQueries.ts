@@ -1,0 +1,141 @@
+import { db } from './graphdb.js'
+import { v4 as uuidv4 } from 'uuid'
+import type { StockItem, CreateItemRequest, UpdateItemRequest } from '../types/index.js'
+
+export async function findAllItems(userId: string): Promise<StockItem[]> {
+  const result = await db.query<{ i: StockItem }>(
+    `MATCH (i:Stock_Item {userId: $userId})
+     RETURN i
+     ORDER BY i.homeOrder`,
+    { userId }
+  )
+  return result.map(r => r.i)
+}
+
+export async function findItemById(id: string, userId: string): Promise<StockItem | null> {
+  const result = await db.query<{ i: StockItem }>(
+    `MATCH (i:Stock_Item {id: $id, userId: $userId}) RETURN i`,
+    { id, userId }
+  )
+  return result[0]?.i || null
+}
+
+export async function getNextOrders(userId: string): Promise<{ homeOrder: number; storeOrder: number }> {
+  const result = await db.query<{ maxHome: number | null; maxStore: number | null }>(
+    `MATCH (i:Stock_Item {userId: $userId})
+     RETURN max(i.homeOrder) AS maxHome, max(i.storeOrder) AS maxStore`,
+    { userId }
+  )
+  const maxHome = result[0]?.maxHome ?? -1
+  const maxStore = result[0]?.maxStore ?? -1
+  return {
+    homeOrder: maxHome + 1,
+    storeOrder: maxStore + 1,
+  }
+}
+
+export async function createItem(userId: string, data: CreateItemRequest): Promise<StockItem> {
+  const id = uuidv4()
+  const { homeOrder, storeOrder } = await getNextOrders(userId)
+
+  const result = await db.query<{ i: StockItem }>(
+    `CREATE (i:Stock_Item {
+      id: $id,
+      userId: $userId,
+      name: $name,
+      targetQuantity: $targetQuantity,
+      currentQuantity: $currentQuantity,
+      unit: $unit,
+      homeLocation: $homeLocation,
+      homeOrder: $homeOrder,
+      storeSection: $storeSection,
+      storeOrder: $storeOrder,
+      createdAt: datetime(),
+      updatedAt: datetime()
+    }) RETURN i`,
+    {
+      id,
+      userId,
+      name: data.name,
+      targetQuantity: data.targetQuantity,
+      currentQuantity: data.currentQuantity ?? 0,
+      unit: data.unit,
+      homeLocation: data.homeLocation,
+      homeOrder,
+      storeSection: data.storeSection,
+      storeOrder,
+    }
+  )
+  return result[0].i
+}
+
+export async function updateItem(id: string, userId: string, data: UpdateItemRequest): Promise<StockItem | null> {
+  // Build dynamic SET clause
+  const setClauses: string[] = ['i.updatedAt = datetime()']
+  const params: Record<string, unknown> = { id, userId }
+
+  if (data.name !== undefined) {
+    setClauses.push('i.name = $name')
+    params.name = data.name
+  }
+  if (data.targetQuantity !== undefined) {
+    setClauses.push('i.targetQuantity = $targetQuantity')
+    params.targetQuantity = data.targetQuantity
+  }
+  if (data.currentQuantity !== undefined) {
+    setClauses.push('i.currentQuantity = $currentQuantity')
+    params.currentQuantity = data.currentQuantity
+  }
+  if (data.unit !== undefined) {
+    setClauses.push('i.unit = $unit')
+    params.unit = data.unit
+  }
+  if (data.homeLocation !== undefined) {
+    setClauses.push('i.homeLocation = $homeLocation')
+    params.homeLocation = data.homeLocation
+  }
+  if (data.homeOrder !== undefined) {
+    setClauses.push('i.homeOrder = $homeOrder')
+    params.homeOrder = data.homeOrder
+  }
+  if (data.storeSection !== undefined) {
+    setClauses.push('i.storeSection = $storeSection')
+    params.storeSection = data.storeSection
+  }
+  if (data.storeOrder !== undefined) {
+    setClauses.push('i.storeOrder = $storeOrder')
+    params.storeOrder = data.storeOrder
+  }
+
+  const result = await db.query<{ i: StockItem }>(
+    `MATCH (i:Stock_Item {id: $id, userId: $userId})
+     SET ${setClauses.join(', ')}
+     RETURN i`,
+    params
+  )
+  return result[0]?.i || null
+}
+
+export async function deleteItem(id: string, userId: string): Promise<boolean> {
+  const result = await db.query<{ count: number }>(
+    `MATCH (i:Stock_Item {id: $id, userId: $userId})
+     DETACH DELETE i
+     RETURN count(i) AS count`,
+    { id, userId }
+  )
+  return (result[0]?.count ?? 0) > 0
+}
+
+export async function reorderItems(
+  userId: string,
+  items: { id: string; homeOrder?: number; storeOrder?: number }[]
+): Promise<void> {
+  for (const item of items) {
+    const updates: UpdateItemRequest = {}
+    if (item.homeOrder !== undefined) updates.homeOrder = item.homeOrder
+    if (item.storeOrder !== undefined) updates.storeOrder = item.storeOrder
+    if (Object.keys(updates).length > 0) {
+      await updateItem(item.id, userId, updates)
+    }
+  }
+}
