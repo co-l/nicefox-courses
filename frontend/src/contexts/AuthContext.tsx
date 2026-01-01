@@ -10,6 +10,7 @@ interface AuthContextType {
   user: AuthUser | null
   loading: boolean
   authError: string | null
+  logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -71,8 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
+  const logout = () => {
+    localStorage.removeItem(DEV_TOKEN_KEY)
+    setUser(null)
+    // Redirect to home, will trigger SSO redirect
+    window.location.href = '/'
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, authError }}>
+    <AuthContext.Provider value={{ user, loading, authError, logout }}>
       {children}
     </AuthContext.Provider>
   )

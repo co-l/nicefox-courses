@@ -2,22 +2,27 @@ import { db } from './graphdb.js'
 import { v4 as uuidv4 } from 'uuid'
 import type { StockItem, CreateItemRequest, UpdateItemRequest } from '../types/index.js'
 
+interface NodeResult<T> {
+  id: string
+  label: string
+  properties: T
+}
+
 export async function findAllItems(userId: string): Promise<StockItem[]> {
-  const result = await db.query<{ i: StockItem }>(
-    `MATCH (i:Stock_Item {userId: $userId})
-     RETURN i
-     ORDER BY i.homeOrder`,
+  const result = await db.query<{ i: NodeResult<StockItem> }>(
+    `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
     { userId }
   )
-  return result.map(r => r.i)
+  // Sort in JS since ORDER BY n.prop not supported
+  return result.map(r => r.i.properties).sort((a, b) => a.homeOrder - b.homeOrder)
 }
 
 export async function findItemById(id: string, userId: string): Promise<StockItem | null> {
-  const result = await db.query<{ i: StockItem }>(
+  const result = await db.query<{ i: NodeResult<StockItem> }>(
     `MATCH (i:Stock_Item {id: $id, userId: $userId}) RETURN i`,
     { id, userId }
   )
-  return result[0]?.i || null
+  return result[0]?.i?.properties || null
 }
 
 export async function getNextOrders(userId: string): Promise<{ homeOrder: number; storeOrder: number }> {
@@ -37,22 +42,10 @@ export async function getNextOrders(userId: string): Promise<{ homeOrder: number
 export async function createItem(userId: string, data: CreateItemRequest): Promise<StockItem> {
   const id = uuidv4()
   const { homeOrder, storeOrder } = await getNextOrders(userId)
+  const now = new Date().toISOString()
 
-  const result = await db.query<{ i: StockItem }>(
-    `CREATE (i:Stock_Item {
-      id: $id,
-      userId: $userId,
-      name: $name,
-      targetQuantity: $targetQuantity,
-      currentQuantity: $currentQuantity,
-      unit: $unit,
-      homeLocation: $homeLocation,
-      homeOrder: $homeOrder,
-      storeSection: $storeSection,
-      storeOrder: $storeOrder,
-      createdAt: datetime(),
-      updatedAt: datetime()
-    }) RETURN i`,
+  const result = await db.query<{ i: NodeResult<StockItem> }>(
+    `CREATE (i:Stock_Item {id: $id, userId: $userId, name: $name, targetQuantity: $targetQuantity, currentQuantity: $currentQuantity, unit: $unit, homeLocation: $homeLocation, homeOrder: $homeOrder, storeSection: $storeSection, storeOrder: $storeOrder, createdAt: $now, updatedAt: $now}) RETURN i`,
     {
       id,
       userId,
@@ -64,14 +57,16 @@ export async function createItem(userId: string, data: CreateItemRequest): Promi
       homeOrder,
       storeSection: data.storeSection,
       storeOrder,
+      now,
     }
   )
-  return result[0].i
+  return result[0].i.properties
 }
 
 export async function updateItem(id: string, userId: string, data: UpdateItemRequest): Promise<StockItem | null> {
   // Build dynamic SET clause
-  const setClauses: string[] = ['i.updatedAt = datetime()']
+  const now = new Date().toISOString()
+  const setClauses: string[] = ['i.updatedAt = $now']
   const params: Record<string, unknown> = { id, userId }
 
   if (data.name !== undefined) {
@@ -107,13 +102,12 @@ export async function updateItem(id: string, userId: string, data: UpdateItemReq
     params.storeOrder = data.storeOrder
   }
 
-  const result = await db.query<{ i: StockItem }>(
-    `MATCH (i:Stock_Item {id: $id, userId: $userId})
-     SET ${setClauses.join(', ')}
-     RETURN i`,
+  params.now = now
+  const result = await db.query<{ i: NodeResult<StockItem> }>(
+    `MATCH (i:Stock_Item {id: $id, userId: $userId}) SET ${setClauses.join(', ')} RETURN i`,
     params
   )
-  return result[0]?.i || null
+  return result[0]?.i?.properties || null
 }
 
 export async function deleteItem(id: string, userId: string): Promise<boolean> {

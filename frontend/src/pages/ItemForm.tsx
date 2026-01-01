@@ -55,9 +55,15 @@ export function ItemForm() {
         await createItem(form)
       }
       navigate('/items')
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to save item:', error)
-      alert('Erreur lors de la sauvegarde')
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: string }, status?: number } }
+        console.error('Response:', axiosError.response?.status, axiosError.response?.data)
+        alert(`Erreur: ${axiosError.response?.data?.error || 'Erreur lors de la sauvegarde'}`)
+      } else {
+        alert('Erreur lors de la sauvegarde')
+      }
     } finally {
       setSaving(false)
     }

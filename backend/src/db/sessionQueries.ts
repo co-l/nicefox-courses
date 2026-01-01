@@ -2,78 +2,98 @@ import { db } from './graphdb.js'
 import { v4 as uuidv4 } from 'uuid'
 import type { StockSession, StockSessionItem, StockItem } from '../types/index.js'
 
+interface NodeResult<T> {
+  id: string
+  label: string
+  properties: T
+}
+
 export interface SessionWithItems extends StockSession {
   items: (StockSessionItem & { item: StockItem })[]
 }
 
 export async function findCurrentSession(userId: string): Promise<SessionWithItems | null> {
-  // Find session that is not completed
-  const sessionResult = await db.query<{ s: StockSession }>(
-    `MATCH (s:Stock_Session {userId: $userId})
-     WHERE s.status <> 'completed'
-     RETURN s
-     ORDER BY s.createdAt DESC
-     LIMIT 1`,
+  // Find sessions for user, then filter in JS
+  const allSessions = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {userId: $userId}) RETURN s`,
     { userId }
   )
+  
+  const activeSession = allSessions.find(r => r.s.properties.status !== 'completed')
+  if (!activeSession) return null
 
-  if (!sessionResult[0]) return null
+  const session = activeSession.s.properties
 
-  const session = sessionResult[0].s
-
-  // Get session items with their associated items
-  const itemsResult = await db.query<{ si: StockSessionItem; i: StockItem }>(
-    `MATCH (si:Stock_SessionItem {sessionId: $sessionId})
-     MATCH (i:Stock_Item {id: si.itemId})
-     RETURN si, i`,
+  // Get session items
+  const sessionItems = await db.query<{ si: NodeResult<StockSessionItem> }>(
+    `MATCH (si:Stock_SessionItem {sessionId: $sessionId}) RETURN si`,
     { sessionId: session.id }
   )
 
+  // Get all items for user
+  const allItems = await db.query<{ i: NodeResult<StockItem> }>(
+    `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
+    { userId }
+  )
+  const itemsMap = new Map(allItems.map(r => [r.i.properties.id, r.i.properties]))
+
   return {
     ...session,
-    items: itemsResult.map(r => ({ ...r.si, item: r.i })),
+    items: sessionItems
+      .map(r => ({
+        ...r.si.properties,
+        item: itemsMap.get(r.si.properties.itemId),
+      }))
+      .filter(item => item.item !== undefined) as (StockSessionItem & { item: StockItem })[],
   }
 }
 
 export async function findSessionById(id: string, userId: string): Promise<SessionWithItems | null> {
-  const sessionResult = await db.query<{ s: StockSession }>(
+  const sessionResult = await db.query<{ s: NodeResult<StockSession> }>(
     `MATCH (s:Stock_Session {id: $id, userId: $userId}) RETURN s`,
     { id, userId }
   )
 
   if (!sessionResult[0]) return null
 
-  const session = sessionResult[0].s
+  const session = sessionResult[0].s.properties
 
-  const itemsResult = await db.query<{ si: StockSessionItem; i: StockItem }>(
-    `MATCH (si:Stock_SessionItem {sessionId: $sessionId})
-     MATCH (i:Stock_Item {id: si.itemId})
-     RETURN si, i`,
+  // Get session items
+  const sessionItems = await db.query<{ si: NodeResult<StockSessionItem> }>(
+    `MATCH (si:Stock_SessionItem {sessionId: $sessionId}) RETURN si`,
     { sessionId: session.id }
   )
 
+  // Get all items for user
+  const allItems = await db.query<{ i: NodeResult<StockItem> }>(
+    `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
+    { userId }
+  )
+  const itemsMap = new Map(allItems.map(r => [r.i.properties.id, r.i.properties]))
+
   return {
     ...session,
-    items: itemsResult.map(r => ({ ...r.si, item: r.i })),
+    items: sessionItems
+      .map(r => ({
+        ...r.si.properties,
+        item: itemsMap.get(r.si.properties.itemId),
+      }))
+      .filter(item => item.item !== undefined) as (StockSessionItem & { item: StockItem })[],
   }
 }
 
 export async function createSession(userId: string): Promise<SessionWithItems> {
   const sessionId = uuidv4()
+  const now = new Date().toISOString()
 
   // Create the session
   await db.execute(
-    `CREATE (s:Stock_Session {
-      id: $sessionId,
-      userId: $userId,
-      status: 'pre-shopping',
-      createdAt: datetime()
-    })`,
-    { sessionId, userId }
+    `CREATE (s:Stock_Session {id: $sessionId, userId: $userId, status: 'pre-shopping', createdAt: $now})`,
+    { sessionId, userId, now }
   )
 
   // Get all items for this user
-  const itemsResult = await db.query<{ i: StockItem }>(
+  const itemsResult = await db.query<{ i: NodeResult<StockItem> }>(
     `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
     { userId }
   )
@@ -82,15 +102,8 @@ export async function createSession(userId: string): Promise<SessionWithItems> {
   for (const { i } of itemsResult) {
     const sessionItemId = uuidv4()
     await db.execute(
-      `CREATE (si:Stock_SessionItem {
-        id: $id,
-        sessionId: $sessionId,
-        itemId: $itemId,
-        countedQuantity: null,
-        toBuy: 0,
-        purchased: false
-      })`,
-      { id: sessionItemId, sessionId, itemId: i.id }
+      `CREATE (si:Stock_SessionItem {id: $id, sessionId: $sessionId, itemId: $itemId, toBuy: 0, purchased: false})`,
+      { id: sessionItemId, sessionId, itemId: i.properties.id }
     )
   }
 
@@ -103,13 +116,11 @@ export async function updateSessionStatus(
   userId: string,
   status: StockSession['status']
 ): Promise<StockSession | null> {
-  const result = await db.query<{ s: StockSession }>(
-    `MATCH (s:Stock_Session {id: $id, userId: $userId})
-     SET s.status = $status
-     RETURN s`,
+  const result = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {id: $id, userId: $userId}) SET s.status = $status RETURN s`,
     { id, userId, status }
   )
-  return result[0]?.s || null
+  return result[0]?.s?.properties || null
 }
 
 export async function updateSessionItem(
@@ -119,7 +130,7 @@ export async function updateSessionItem(
   data: { countedQuantity?: number | null; purchased?: boolean }
 ): Promise<StockSessionItem | null> {
   // Verify session belongs to user
-  const sessionCheck = await db.query<{ s: StockSession }>(
+  const sessionCheck = await db.query<{ s: NodeResult<StockSession> }>(
     `MATCH (s:Stock_Session {id: $sessionId, userId: $userId}) RETURN s`,
     { sessionId, userId }
   )
@@ -135,15 +146,13 @@ export async function updateSessionItem(
 
     // Calculate toBuy if countedQuantity is set
     if (data.countedQuantity !== null) {
-      // Get target quantity from the item
-      const itemResult = await db.query<{ i: StockItem }>(
-        `MATCH (si:Stock_SessionItem {sessionId: $sessionId, itemId: $itemId})
-         MATCH (i:Stock_Item {id: si.itemId})
-         RETURN i`,
-        { sessionId, itemId }
+      // Get target quantity from the item directly
+      const itemResult = await db.query<{ i: NodeResult<StockItem> }>(
+        `MATCH (i:Stock_Item {id: $itemId}) RETURN i`,
+        { itemId }
       )
       if (itemResult[0]) {
-        const toBuy = Math.max(0, itemResult[0].i.targetQuantity - data.countedQuantity)
+        const toBuy = Math.max(0, itemResult[0].i.properties.targetQuantity - data.countedQuantity)
         setClauses.push('si.toBuy = $toBuy')
         params.toBuy = toBuy
       }
@@ -157,52 +166,50 @@ export async function updateSessionItem(
 
   if (setClauses.length === 0) return null
 
-  const result = await db.query<{ si: StockSessionItem }>(
-    `MATCH (si:Stock_SessionItem {sessionId: $sessionId, itemId: $itemId})
-     SET ${setClauses.join(', ')}
-     RETURN si`,
+  const result = await db.query<{ si: NodeResult<StockSessionItem> }>(
+    `MATCH (si:Stock_SessionItem {sessionId: $sessionId, itemId: $itemId}) SET ${setClauses.join(', ')} RETURN si`,
     params
   )
-  return result[0]?.si || null
+  return result[0]?.si?.properties || null
 }
 
 export async function completeSession(id: string, userId: string): Promise<StockSession | null> {
-  // Update stock for purchased items
-  const purchasedItems = await db.query<{ si: StockSessionItem }>(
-    `MATCH (s:Stock_Session {id: $id, userId: $userId})
-     MATCH (si:Stock_SessionItem {sessionId: $id})
-     WHERE si.purchased = true AND si.toBuy > 0
-     RETURN si`,
+  // Verify session belongs to user
+  const sessionCheck = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {id: $id, userId: $userId}) RETURN s`,
     { id, userId }
   )
+  if (!sessionCheck[0]) return null
+
+  // Get all session items, filter in JS
+  const allItems = await db.query<{ si: NodeResult<StockSessionItem> }>(
+    `MATCH (si:Stock_SessionItem {sessionId: $id}) RETURN si`,
+    { id }
+  )
+  const purchasedItems = allItems.filter(r => r.si.properties.purchased === true && r.si.properties.toBuy > 0)
 
   // Update each item's currentQuantity
+  const now = new Date().toISOString()
   for (const { si } of purchasedItems) {
     await db.execute(
-      `MATCH (i:Stock_Item {id: $itemId})
-       SET i.currentQuantity = i.currentQuantity + $toBuy,
-           i.updatedAt = datetime()`,
-      { itemId: si.itemId, toBuy: si.toBuy }
+      `MATCH (i:Stock_Item {id: $itemId}) SET i.currentQuantity = i.currentQuantity + $toBuy, i.updatedAt = $now`,
+      { itemId: si.properties.itemId, toBuy: si.properties.toBuy, now }
     )
   }
 
   // Mark session as completed
-  const result = await db.query<{ s: StockSession }>(
-    `MATCH (s:Stock_Session {id: $id, userId: $userId})
-     SET s.status = 'completed', s.completedAt = datetime()
-     RETURN s`,
-    { id, userId }
+  const result = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {id: $id, userId: $userId}) SET s.status = 'completed', s.completedAt = $now RETURN s`,
+    { id, userId, now }
   )
 
-  return result[0]?.s || null
+  return result[0]?.s?.properties || null
 }
 
 export async function hasActiveSession(userId: string): Promise<boolean> {
-  const result = await db.query<{ count: number }>(
-    `MATCH (s:Stock_Session {userId: $userId})
-     WHERE s.status <> 'completed'
-     RETURN count(s) AS count`,
+  const allSessions = await db.query<{ s: NodeResult<StockSession> }>(
+    `MATCH (s:Stock_Session {userId: $userId}) RETURN s`,
     { userId }
   )
-  return (result[0]?.count ?? 0) > 0
+  return allSessions.some(r => r.s.properties.status !== 'completed')
 }
