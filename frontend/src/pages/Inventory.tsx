@@ -24,12 +24,13 @@ import type { StockItem } from '../types'
 interface SortableInventoryItemProps {
   item: StockItem
   onEdit: () => void
+  onDelete: () => void
   onIncrement: () => void
   onDecrement: () => void
   onQuantityChange: (value: string) => void
 }
 
-function SortableInventoryItem({ item, onEdit, onIncrement, onDecrement, onQuantityChange }: SortableInventoryItemProps) {
+function SortableInventoryItem({ item, onEdit, onDelete, onIncrement, onDecrement, onQuantityChange }: SortableInventoryItemProps) {
   const {
     attributes,
     listeners,
@@ -70,6 +71,15 @@ function SortableInventoryItem({ item, onEdit, onIncrement, onDecrement, onQuant
         <div className="text-xs text-gray-500">
           objectif: {item.targetQuantity} {item.unit} · {item.storeSection || 'Aucun magasin'}
         </div>
+      </button>
+      <button
+        onClick={onDelete}
+        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+        aria-label="Supprimer"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
       </button>
       <div className="flex items-center gap-1">
         <button
@@ -200,6 +210,16 @@ export function Inventory() {
     }
   }
 
+  async function handleDelete(item: StockItem) {
+    if (!confirm(`Supprimer "${item.name}" ?`)) return
+    try {
+      await deleteItem(item.id)
+      setItems(prev => prev.filter(i => i.id !== item.id))
+    } catch (error) {
+      console.error('Failed to delete item:', error)
+    }
+  }
+
   async function handleDeleteAll() {
     if (!confirm(`Supprimer les ${items.length} éléments ?`)) return
     try {
@@ -277,6 +297,7 @@ export function Inventory() {
                     key={item.id}
                     item={item}
                     onEdit={() => navigate(`/items/${item.id}`)}
+                    onDelete={() => handleDelete(item)}
                     onIncrement={() => handleIncrement(item)}
                     onDecrement={() => handleDecrement(item)}
                     onQuantityChange={(value) => handleQuantityChange(item, value)}
