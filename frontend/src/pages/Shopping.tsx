@@ -263,12 +263,13 @@ export function Shopping() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Liste de courses</h1>
-        <span className="text-sm font-medium text-gray-600">
-          {purchasedCount}/{totalCount}
-        </span>
-      </div>
+      {totalCount > 0 && (
+        <div className="flex items-center justify-end mb-4">
+          <span className="text-sm font-medium text-gray-600">
+            {purchasedCount}/{totalCount}
+          </span>
+        </div>
+      )}
 
       {shoppingItems.length === 0 ? (
         <div className="text-center py-12">

@@ -11,7 +11,9 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const isHome = location.pathname === '/'
+  const isInventory = location.pathname === '/inventory'
   const isShopping = location.pathname === '/shopping'
+  const isMainPage = isHome || isInventory || isShopping
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -35,9 +37,46 @@ export function Layout({ children }: LayoutProps) {
             </div>
           )}
         </div>
+        {/* Navigation tabs for main pages */}
+        {isMainPage && (
+          <div className="max-w-lg mx-auto px-4 pb-2">
+            <div className="flex rounded-lg bg-gray-100 p-1">
+              <Link
+                to="/"
+                className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
+                  isHome
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Accueil
+              </Link>
+              <Link
+                to="/inventory"
+                className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
+                  isInventory
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Inventaire
+              </Link>
+              <Link
+                to="/shopping"
+                className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
+                  isShopping
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Courses
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
       <main className="max-w-lg mx-auto px-4 py-6">
-        {!isHome && !isShopping && (
+        {!isMainPage && (
           <Link
             to="/"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
