@@ -59,8 +59,8 @@ export async function reorderItems(
   await api.post('/items/reorder', { items })
 }
 
-export async function createTemporaryItem(name: string, quantity: number = 1, unit: string = 'unite(s)'): Promise<StockItem> {
-  const { data } = await api.post('/items/temporary', { name, quantity, unit })
+export async function createTemporaryItem(name: string, quantity: number = 1, unit: string = 'unite(s)', storeSection?: string): Promise<StockItem> {
+  const { data } = await api.post('/items/temporary', { name, quantity, unit, storeSection })
   return data
 }
 

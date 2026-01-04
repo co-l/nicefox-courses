@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getItem, createItem, updateItem } from '../services/api'
-import type { CreateItemRequest } from '../types'
-
-const STORES = ['Billa', 'Lidl', 'Happy Market'] as const
+import { STORES, type CreateItemRequest } from '../types'
 
 export function ItemForm() {
   const navigate = useNavigate()

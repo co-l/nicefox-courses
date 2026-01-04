@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createTemporaryItem, getItems, deleteItem } from '../services/api'
-import type { StockItem } from '../types'
+import { STORES, type StockItem, type Store } from '../types'
 
 type Unit = 'kg' | 'unité(s)'
 
@@ -12,6 +12,7 @@ export function Home() {
   const [tempItemName, setTempItemName] = useState('')
   const [tempItemQuantity, setTempItemQuantity] = useState('1')
   const [tempItemUnit, setTempItemUnit] = useState<Unit>('unité(s)')
+  const [tempItemStore, setTempItemStore] = useState<Store>(STORES[0])
   const [addingItem, setAddingItem] = useState(false)
 
   useEffect(() => {
@@ -37,11 +38,12 @@ export function Home() {
 
     setAddingItem(true)
     try {
-      const item = await createTemporaryItem(tempItemName.trim(), quantity, tempItemUnit)
+      const item = await createTemporaryItem(tempItemName.trim(), quantity, tempItemUnit, tempItemStore)
       setTemporaryItems(prev => [...prev, item])
       setTempItemName('')
       setTempItemQuantity('1')
       setTempItemUnit('unité(s)')
+      setTempItemStore(STORES[0])
     } catch (error) {
       console.error('Failed to add temporary item:', error)
       alert('Erreur lors de l\'ajout')
@@ -128,6 +130,22 @@ export function Home() {
             placeholder="Ex: Ampoules, Piles..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
           />
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            {STORES.map((store) => (
+              <button
+                key={store}
+                type="button"
+                onClick={() => setTempItemStore(store)}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  tempItemStore === store
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                } ${store !== STORES[0] ? 'border-l border-gray-300' : ''}`}
+              >
+                {store}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             <input
               type="number"

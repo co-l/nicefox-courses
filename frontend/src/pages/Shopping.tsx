@@ -19,9 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getItems, updateItem, deleteItem, reorderItems } from '../services/api'
-import type { StockItem } from '../types'
-
-const STORES = ['Billa', 'Lidl', 'Happy Market'] as const
+import { STORES, type StockItem } from '../types'
 
 interface ShoppingItemData {
   item: StockItem

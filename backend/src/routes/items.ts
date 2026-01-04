@@ -103,7 +103,7 @@ router.post('/reorder', async (req: Request, res: Response) => {
 // POST /api/items/temporary - Create temporary item for shopping list
 router.post('/temporary', async (req: Request, res: Response) => {
   try {
-    const { name, quantity = 1, unit = 'unité(s)' } = req.body as { name: string; quantity?: number; unit?: string }
+    const { name, quantity = 1, unit = 'unité(s)', storeSection } = req.body as { name: string; quantity?: number; unit?: string; storeSection?: string }
     
     if (!name || typeof name !== 'string' || name.trim() === '') {
       res.status(400).json({ error: 'name is required' })
@@ -116,6 +116,7 @@ router.post('/temporary', async (req: Request, res: Response) => {
       targetQuantity: quantity,
       currentQuantity: 0,
       unit,
+      storeSection,
       isTemporary: true,
     })
 

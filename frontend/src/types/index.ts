@@ -1,3 +1,7 @@
+// Store constants
+export const STORES = ['Billa', 'Lidl', 'Happy Market'] as const
+export type Store = typeof STORES[number]
+
 // Auth user type (matches nicefox-auth)
 export interface AuthUser {
   id: string
