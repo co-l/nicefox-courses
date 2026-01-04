@@ -1,86 +1,71 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import axios from 'axios'
-import { getMe } from '../services/api'
-import type { AuthUser } from '../types'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-// Storage key for dev mode token
-const DEV_TOKEN_KEY = 'dev_auth_token'
+const TOKEN_KEY = 'auth_token'
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'https://auth.nicefox.net'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3100/api'
+
+interface User {
+  id: string
+  email: string
+  role: 'user' | 'admin'
+}
 
 interface AuthContextType {
-  user: AuthUser | null
+  user: User | null
   loading: boolean
-  authError: string | null
+  login: () => void
   logout: () => void
+  getToken: () => string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function checkAuth() {
-      // Check if SSO returned a token in URL (for dev mode / cross-domain)
-      const urlParams = new URLSearchParams(window.location.search)
-      const tokenFromUrl = urlParams.get('token')
-
-      if (tokenFromUrl) {
-        // Store token for dev mode and clean URL
-        console.log('Token from URL, storing in localStorage')
-        localStorage.setItem(DEV_TOKEN_KEY, tokenFromUrl)
-        window.history.replaceState({}, '', window.location.pathname)
-      }
-      
-      console.log('Token in localStorage:', !!localStorage.getItem(DEV_TOKEN_KEY))
-
-      try {
-        const me = await getMe()
-        setUser(me)
-        setAuthError(null)
-      } catch (error) {
-        console.log('Auth error:', error)
-        if (axios.isAxiosError(error)) {
-          const status = error.response?.status
-          console.log('Axios error status:', status)
-
-          // 401 or no response (network error before auth) = not authenticated
-          if (status === 401 || !error.response) {
-            // Not authenticated - clear token and allow redirect to SSO
-            if (!tokenFromUrl) {
-              localStorage.removeItem(DEV_TOKEN_KEY)
-            }
-            setUser(null)
-            setAuthError(null)
-          } else {
-            // Server error (500, etc.) - don't redirect to SSO
-            setUser(null)
-            setAuthError(error.response?.data?.error || 'Erreur serveur lors de l\'authentification')
-            console.error('Auth check failed with server error:', status, error.message)
-          }
-        } else {
-          console.log('Non-axios error:', error)
-          // Treat unknown errors as auth failure, not server error
-          setUser(null)
-          setAuthError(null)
-        }
-      } finally {
-        setLoading(false)
-      }
+    // Check for token in URL (returning from auth)
+    const params = new URLSearchParams(window.location.search)
+    const tokenFromUrl = params.get('token')
+    
+    if (tokenFromUrl) {
+      localStorage.setItem(TOKEN_KEY, tokenFromUrl)
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname)
     }
-    checkAuth()
+
+    // Verify token with backend
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(setUser)
+      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      .finally(() => setLoading(false))
   }, [])
 
+  const login = () => {
+    const returnUrl = window.location.href
+    window.location.href = `${AUTH_URL}/login?redirect=${encodeURIComponent(returnUrl)}`
+  }
+
   const logout = () => {
-    localStorage.removeItem(DEV_TOKEN_KEY)
+    localStorage.removeItem(TOKEN_KEY)
     setUser(null)
-    // Redirect to home, will trigger SSO redirect
     window.location.href = '/'
   }
 
+  const getToken = () => localStorage.getItem(TOKEN_KEY)
+
   return (
-    <AuthContext.Provider value={{ user, loading, authError, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, getToken }}>
       {children}
     </AuthContext.Provider>
   )

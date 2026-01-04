@@ -1,31 +1,28 @@
-import { db } from './graphdb.js'
+import { getDb } from './graphdb.js'
 import { v4 as uuidv4 } from 'uuid'
 import type { StockItem, CreateItemRequest, UpdateItemRequest } from '../types/index.js'
 
-interface NodeResult<T> {
-  id: string
-  label: string
-  properties: T
-}
-
 export async function findAllItems(userId: string): Promise<StockItem[]> {
-  const result = await db.query<{ i: NodeResult<StockItem> }>(
+  const db = getDb()
+  const result = await db.query<{ i: StockItem }>(
     `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
     { userId }
   )
   // Sort in JS since ORDER BY n.prop not supported
-  return result.map(r => r.i.properties).sort((a, b) => a.homeOrder - b.homeOrder)
+  return result.map(r => r.i).sort((a, b) => a.homeOrder - b.homeOrder)
 }
 
 export async function findItemById(id: string, userId: string): Promise<StockItem | null> {
-  const result = await db.query<{ i: NodeResult<StockItem> }>(
+  const db = getDb()
+  const result = await db.query<{ i: StockItem }>(
     `MATCH (i:Stock_Item {id: $id, userId: $userId}) RETURN i`,
     { id, userId }
   )
-  return result[0]?.i?.properties || null
+  return result[0]?.i || null
 }
 
 export async function getNextOrders(userId: string): Promise<{ homeOrder: number; storeOrder: number }> {
+  const db = getDb()
   const result = await db.query<{ maxHome: number | null; maxStore: number | null }>(
     `MATCH (i:Stock_Item {userId: $userId})
      RETURN max(i.homeOrder) AS maxHome, max(i.storeOrder) AS maxStore`,
@@ -40,11 +37,12 @@ export async function getNextOrders(userId: string): Promise<{ homeOrder: number
 }
 
 export async function createItem(userId: string, data: CreateItemRequest): Promise<StockItem> {
+  const db = getDb()
   const id = uuidv4()
   const { homeOrder, storeOrder } = await getNextOrders(userId)
   const now = new Date().toISOString()
 
-  const result = await db.query<{ i: NodeResult<StockItem> }>(
+  const result = await db.query<{ i: StockItem }>(
     `CREATE (i:Stock_Item {id: $id, userId: $userId, name: $name, targetQuantity: $targetQuantity, currentQuantity: $currentQuantity, unit: $unit, homeLocation: $homeLocation, homeOrder: $homeOrder, storeSection: $storeSection, storeOrder: $storeOrder, isTemporary: $isTemporary, createdAt: $now, updatedAt: $now}) RETURN i`,
     {
       id,
@@ -61,10 +59,11 @@ export async function createItem(userId: string, data: CreateItemRequest): Promi
       now,
     }
   )
-  return result[0].i.properties
+  return result[0].i
 }
 
 export async function updateItem(id: string, userId: string, data: UpdateItemRequest): Promise<StockItem | null> {
+  const db = getDb()
   // Build dynamic SET clause
   const now = new Date().toISOString()
   const setClauses: string[] = ['i.updatedAt = $now']
@@ -104,14 +103,15 @@ export async function updateItem(id: string, userId: string, data: UpdateItemReq
   }
 
   params.now = now
-  const result = await db.query<{ i: NodeResult<StockItem> }>(
+  const result = await db.query<{ i: StockItem }>(
     `MATCH (i:Stock_Item {id: $id, userId: $userId}) SET ${setClauses.join(', ')} RETURN i`,
     params
   )
-  return result[0]?.i?.properties || null
+  return result[0]?.i || null
 }
 
 export async function deleteItem(id: string, userId: string): Promise<boolean> {
+  const db = getDb()
   // Check if item exists first
   const existing = await findItemById(id, userId)
   if (!existing) return false
@@ -138,17 +138,18 @@ export async function reorderItems(
 }
 
 export async function deleteTemporaryItems(userId: string): Promise<void> {
+  const db = getDb()
   // Get all temporary items first (can't filter in WHERE)
-  const result = await db.query<{ i: NodeResult<StockItem> }>(
+  const result = await db.query<{ i: StockItem }>(
     `MATCH (i:Stock_Item {userId: $userId}) RETURN i`,
     { userId }
   )
-  const temporaryItems = result.filter(r => r.i.properties.isTemporary === true)
+  const temporaryItems = result.filter(r => r.i.isTemporary === true)
   
   for (const { i } of temporaryItems) {
     await db.execute(
       `MATCH (i:Stock_Item {id: $id}) DETACH DELETE i`,
-      { id: i.properties.id }
+      { id: i.id }
     )
   }
 }

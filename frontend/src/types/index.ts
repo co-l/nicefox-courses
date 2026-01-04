@@ -1,3 +1,4 @@
+// Auth user type (matches nicefox-auth)
 export interface AuthUser {
   id: string
   email: string

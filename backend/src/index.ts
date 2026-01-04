@@ -2,10 +2,10 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import { authMiddleware } from 'nicefox-auth'
 import { config } from './config.js'
-import { authMiddleware } from './middleware/auth.js'
 import { stockUserMiddleware } from './services/user.js'
-import { testConnection } from './db/graphdb.js'
+import { initDatabase, testConnection } from './db/graphdb.js'
 import itemsRouter from './routes/items.js'
 import sessionsRouter from './routes/sessions.js'
 
@@ -35,6 +35,9 @@ app.use('/api/sessions', authMiddleware({ jwtSecret: config.jwtSecret }), stockU
 
 // Start server
 async function start() {
+  // Initialize GraphDB
+  await initDatabase()
+  
   // Test GraphDB connection
   const connected = await testConnection()
   if (!connected) {

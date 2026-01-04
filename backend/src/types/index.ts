@@ -1,17 +1,5 @@
-// Auth types (from nicefox-auth/shared)
-export interface AuthUser {
-  id: string
-  email: string
-  role: 'user' | 'admin'
-}
-
-export interface TokenPayload {
-  userId: string
-  email: string
-  role: 'user' | 'admin'
-  iat: number
-  exp: number
-}
+// Re-export auth types from nicefox-auth
+export type { AuthUser } from 'nicefox-auth'
 
 // Domain types
 export interface StockUser {
@@ -84,12 +72,10 @@ export interface UpdateSessionItemRequest {
   purchased?: boolean
 }
 
-// Extend Express Request
+// Extend Express Request (authUser is already extended by nicefox-auth)
 declare global {
   namespace Express {
     interface Request {
-      authUser?: AuthUser
-      tokenPayload?: TokenPayload
       stockUser?: StockUser
     }
   }

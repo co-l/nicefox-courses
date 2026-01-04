@@ -10,23 +10,17 @@ import type {
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3100/api'
-
-// Storage key for dev mode token
-const DEV_TOKEN_KEY = 'dev_auth_token'
+const TOKEN_KEY = 'auth_token'
 
 const api = axios.create({
   baseURL: API_URL,
-  withCredentials: true,
 })
 
-// Request interceptor: add Authorization header in dev mode
+// Request interceptor: add Authorization header from stored token
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // In dev mode, send stored token as Bearer header
-  // (cookies from .nicefox.net won't work on localhost)
-  const devToken = localStorage.getItem(DEV_TOKEN_KEY)
-  console.log('API request to:', config.url, 'Token present:', !!devToken)
-  if (devToken && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${devToken}`
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
@@ -68,7 +62,7 @@ export async function reorderItems(
   await api.post('/items/reorder', { items })
 }
 
-export async function createTemporaryItem(name: string, quantity: number = 1, unit: string = 'unité(s)'): Promise<StockItem> {
+export async function createTemporaryItem(name: string, quantity: number = 1, unit: string = 'unite(s)'): Promise<StockItem> {
   const { data } = await api.post('/items/temporary', { name, quantity, unit })
   return data
 }
