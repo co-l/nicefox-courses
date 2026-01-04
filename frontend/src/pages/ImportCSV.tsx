@@ -71,7 +71,7 @@ export function ImportCSV() {
     }
 
     setImporting(false)
-    navigate('/items')
+    navigate('/inventory')
   }
 
   return (
