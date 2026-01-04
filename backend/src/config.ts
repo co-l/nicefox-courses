@@ -4,12 +4,11 @@ export const config = {
   port: parseInt(process.env.PORT || '3100', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // GraphDB
+  // GraphDB (env is determined by NODE_ENV in the GraphDB implementation)
   graphdb: {
     url: process.env.GRAPHDB_URL || 'https://graphdb.nicefox.net',
     project: process.env.GRAPHDB_PROJECT || 'stock',
     apiKey: process.env.GRAPHDB_API_KEY || '',
-    env: (process.env.GRAPHDB_ENV || 'production') as 'production' | 'test',
   },
 
   // Auth (uses getJwtSecret which auto-detects localhost)

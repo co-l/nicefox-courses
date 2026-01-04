@@ -29,3 +29,6 @@ npm-debug.log*
 
 # Vite
 *.local
+
+# Local data (GraphDB SQLite)
+data/

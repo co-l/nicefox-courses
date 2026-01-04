@@ -9,7 +9,6 @@ export async function initDatabase(): Promise<GraphDBClient> {
   db = await GraphDB({
     url: config.graphdb.url,
     project: config.graphdb.project,
-    env: config.graphdb.env,
     apiKey: config.graphdb.apiKey,
   })
 
