@@ -46,10 +46,6 @@ export interface UpdateItemRequest {
   storeOrder?: number
 }
 
-export interface ReorderItemsRequest {
-  items: { id: string; homeOrder?: number; storeOrder?: number }[]
-}
-
 // Extend Express Request (authUser is already extended by nicefox-auth)
 declare global {
   namespace Express {

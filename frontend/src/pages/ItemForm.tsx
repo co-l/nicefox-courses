@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getItem, createItem, updateItem } from '../services/api'
 import type { CreateItemRequest } from '../types'
 
+const STORES = ['Billa', 'Lidl', 'Happy Market'] as const
+
 export function ItemForm() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -15,6 +17,7 @@ export function ItemForm() {
     targetQuantity: 1,
     currentQuantity: 0,
     unit: '',
+    storeSection: STORES[0],
   })
 
   useEffect(() => {
@@ -31,10 +34,11 @@ export function ItemForm() {
         targetQuantity: item.targetQuantity,
         currentQuantity: item.currentQuantity,
         unit: item.unit,
+        storeSection: item.storeSection || STORES[0],
       })
     } catch (error) {
       console.error('Failed to load item:', error)
-      navigate('/items')
+      navigate('/inventory')
     } finally {
       setLoading(false)
     }
@@ -50,7 +54,7 @@ export function ItemForm() {
       } else {
         await createItem(form)
       }
-      navigate('/items')
+      navigate('/inventory')
     } catch (error: unknown) {
       console.error('Failed to save item:', error)
       if (error && typeof error === 'object' && 'response' in error) {
@@ -92,6 +96,28 @@ export function ItemForm() {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Ex: Carottes"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Magasin
+          </label>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            {STORES.map((store) => (
+              <button
+                key={store}
+                type="button"
+                onClick={() => setForm({ ...form, storeSection: store })}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  form.storeSection === store
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                } ${store !== STORES[0] ? 'border-l border-gray-300' : ''}`}
+              >
+                {store}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -146,7 +172,7 @@ export function ItemForm() {
         <div className="flex gap-3 pt-4">
           <button
             type="button"
-            onClick={() => navigate('/items')}
+            onClick={() => navigate('/inventory')}
             className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
           >
             Annuler

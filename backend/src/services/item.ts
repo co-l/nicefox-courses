@@ -25,13 +25,6 @@ export async function deleteItem(id: string, userId: string): Promise<boolean> {
   return itemQueries.deleteItem(id, userId)
 }
 
-export async function reorderItems(
-  userId: string,
-  items: { id: string; homeOrder?: number; storeOrder?: number }[]
-): Promise<void> {
-  return itemQueries.reorderItems(userId, items)
-}
-
 export async function deleteTemporaryItems(userId: string): Promise<void> {
   return itemQueries.deleteTemporaryItems(userId)
 }

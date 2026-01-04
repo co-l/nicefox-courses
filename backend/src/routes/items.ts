@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import * as itemService from '../services/item.js'
-import type { CreateItemRequest, UpdateItemRequest, ReorderItemsRequest } from '../types/index.js'
+import type { CreateItemRequest, UpdateItemRequest } from '../types/index.js'
 
 const router = Router()
 
@@ -81,22 +81,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Failed to delete item:', error)
     res.status(500).json({ error: 'Failed to delete item' })
-  }
-})
-
-// POST /api/items/reorder - Reorder items
-router.post('/reorder', async (req: Request, res: Response) => {
-  try {
-    const data: ReorderItemsRequest = req.body
-    if (!Array.isArray(data.items)) {
-      res.status(400).json({ error: 'items must be an array' })
-      return
-    }
-    await itemService.reorderItems(req.stockUser!.id, data.items)
-    res.status(200).json({ success: true })
-  } catch (error) {
-    console.error('Failed to reorder items:', error)
-    res.status(500).json({ error: 'Failed to reorder items' })
   }
 })
 

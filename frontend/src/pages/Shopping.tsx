@@ -1,26 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { getItems, updateItem, reorderItems, deleteItem } from '../services/api'
+import { getItems, updateItem, deleteItem } from '../services/api'
 import type { StockItem } from '../types'
-import { SortableShoppingItem } from '../components/SortableShoppingItem'
+import { ShoppingItem } from '../components/ShoppingItem'
 
-interface ShoppingItem {
+const STORES = ['Billa', 'Lidl', 'Happy Market'] as const
+
+interface ShoppingItemData {
   item: StockItem
   toBuy: number
   purchased: boolean
@@ -28,26 +14,8 @@ interface ShoppingItem {
 
 export function Shopping() {
   const navigate = useNavigate()
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([])
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItemData[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Sensors optimized for mobile touch
-  const sensors = useSensors(
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 5,
-      },
-    }),
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
 
   useEffect(() => {
     loadItems()
@@ -57,13 +25,12 @@ export function Shopping() {
     try {
       const items = await getItems()
       // Build shopping list: items where currentQuantity < targetQuantity
-      const toBuyItems: ShoppingItem[] = items
+      const toBuyItems: ShoppingItemData[] = items
         .filter(item => item.currentQuantity < item.targetQuantity)
-        .sort((a, b) => a.storeOrder - b.storeOrder)
         .map(item => ({
           item,
           toBuy: item.targetQuantity - item.currentQuantity,
-          purchased: false, // Reset purchased state on load
+          purchased: false,
         }))
       setShoppingItems(toBuyItems)
     } catch (error) {
@@ -73,7 +40,7 @@ export function Shopping() {
     }
   }
 
-  async function handleTogglePurchased(shoppingItem: ShoppingItem) {
+  async function handleTogglePurchased(shoppingItem: ShoppingItemData) {
     const newPurchased = !shoppingItem.purchased
     
     // Optimistic update
@@ -98,7 +65,7 @@ export function Shopping() {
         loadItems()
       }
     } else {
-      // If unmarking, reset currentQuantity to what it was before (0 for simplicity)
+      // If unmarking, reset currentQuantity to what it was before
       try {
         await updateItem(shoppingItem.item.id, {
           currentQuantity: shoppingItem.item.currentQuantity,
@@ -107,40 +74,6 @@ export function Shopping() {
         console.error('Failed to update item:', error)
         loadItems()
       }
-    }
-  }
-
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = shoppingItems.findIndex((si) => si.item.id === active.id)
-    const newIndex = shoppingItems.findIndex((si) => si.item.id === over.id)
-
-    const reorderedItems = arrayMove(shoppingItems, oldIndex, newIndex)
-
-    // Update local state optimistically - update storeOrder on the item
-    const updatedShoppingItems = reorderedItems.map((si, index) => ({
-      ...si,
-      item: {
-        ...si.item,
-        storeOrder: index,
-      },
-    }))
-
-    setShoppingItems(updatedShoppingItems)
-
-    // Persist to server - update storeOrder on items
-    try {
-      await reorderItems(
-        updatedShoppingItems.map((si) => ({
-          id: si.item.id,
-          storeOrder: si.item.storeOrder,
-        }))
-      )
-    } catch (error) {
-      console.error('Failed to reorder items:', error)
-      loadItems()
     }
   }
 
@@ -154,6 +87,20 @@ export function Shopping() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
+  }
+
+  // Group items by store in the defined order
+  const groupedByStore: { store: string; items: ShoppingItemData[] }[] = STORES.map(store => ({
+    store,
+    items: shoppingItems.filter(si => si.item.storeSection === store),
+  })).filter(group => group.items.length > 0)
+
+  // Items without a store (or with an unknown store)
+  const otherItems = shoppingItems.filter(
+    si => !STORES.includes(si.item.storeSection as typeof STORES[number])
+  )
+  if (otherItems.length > 0) {
+    groupedByStore.push({ store: 'Autre', items: otherItems })
   }
 
   const purchasedCount = shoppingItems.filter((si) => si.purchased).length
@@ -184,28 +131,25 @@ export function Shopping() {
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-500 mb-2">Maintenez et glissez pour réordonner</p>
-          
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={shoppingItems.map((si) => si.item.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 mb-6">
-                {shoppingItems.map((shoppingItem) => (
-                  <SortableShoppingItem
-                    key={shoppingItem.item.id}
-                    shoppingItem={shoppingItem}
-                    onTogglePurchased={() => handleTogglePurchased(shoppingItem)}
-                  />
-                ))}
+          <div className="space-y-6 mb-6">
+            {groupedByStore.map(({ store, items }) => (
+              <div key={store}>
+                <h2 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <span className="text-lg">🏪</span>
+                  {store}
+                </h2>
+                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {items.map((shoppingItem) => (
+                    <ShoppingItem
+                      key={shoppingItem.item.id}
+                      shoppingItem={shoppingItem}
+                      onTogglePurchased={() => handleTogglePurchased(shoppingItem)}
+                    />
+                  ))}
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
+            ))}
+          </div>
 
           <button
             onClick={handleDone}
