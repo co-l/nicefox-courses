@@ -1,12 +1,124 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getItems, updateItem, deleteItem } from '../services/api'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { getItems, updateItem, deleteItem, reorderItems } from '../services/api'
 import type { StockItem } from '../types'
+
+interface SortableInventoryItemProps {
+  item: StockItem
+  onEdit: () => void
+  onIncrement: () => void
+  onDecrement: () => void
+  onQuantityChange: (value: string) => void
+}
+
+function SortableInventoryItem({ item, onEdit, onIncrement, onDecrement, onQuantityChange }: SortableInventoryItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`p-3 flex items-center gap-2 ${isDragging ? 'opacity-50 bg-blue-50' : ''}`}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none p-2 -m-2"
+        aria-label="Réordonner"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </button>
+
+      <button
+        onClick={onEdit}
+        className="flex-1 min-w-0 text-left"
+      >
+        <div className="font-medium truncate">{item.name}</div>
+        <div className="text-xs text-gray-500">
+          objectif: {item.targetQuantity} {item.unit} · {item.storeSection || 'Aucun magasin'}
+        </div>
+      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onDecrement}
+          className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
+        >
+          -
+        </button>
+        <input
+          type="number"
+          min="0"
+          step="0.1"
+          value={item.currentQuantity}
+          onChange={(e) => onQuantityChange(e.target.value)}
+          className="w-14 h-10 px-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <button
+          onClick={onIncrement}
+          className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export function Inventory() {
   const navigate = useNavigate()
   const [items, setItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Touch-optimized sensors
+  const sensors = useSensors(
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadItems()
@@ -52,7 +164,39 @@ export function Inventory() {
       await updateItem(item.id, { currentQuantity: qty })
     } catch (error) {
       console.error('Failed to update item:', error)
-      loadItems() // Reload on error
+      loadItems()
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const sortedItems = [...items].sort((a, b) => a.homeOrder - b.homeOrder)
+    const oldIndex = sortedItems.findIndex((item) => item.id === active.id)
+    const newIndex = sortedItems.findIndex((item) => item.id === over.id)
+
+    const reorderedItems = arrayMove(sortedItems, oldIndex, newIndex)
+
+    // Update homeOrder for all items
+    const updatedItems = reorderedItems.map((item, index) => ({
+      ...item,
+      homeOrder: index,
+    }))
+
+    setItems(updatedItems)
+
+    // Persist to server
+    try {
+      await reorderItems(
+        updatedItems.map((item) => ({
+          id: item.id,
+          homeOrder: item.homeOrder,
+        }))
+      )
+    } catch (error) {
+      console.error('Failed to reorder items:', error)
+      loadItems()
     }
   }
 
@@ -77,16 +221,7 @@ export function Inventory() {
     )
   }
 
-  // Group items by homeLocation, sorted by homeOrder
   const sortedItems = [...items].sort((a, b) => a.homeOrder - b.homeOrder)
-  const groupedItems = sortedItems.reduce((acc, item) => {
-    const location = item.homeLocation
-    if (!acc[location]) {
-      acc[location] = []
-    }
-    acc[location].push(item)
-    return acc
-  }, {} as Record<string, StockItem[]>)
 
   return (
     <div>
@@ -131,53 +266,29 @@ export function Inventory() {
           <p className="text-sm mt-1">Ajoutez des éléments pour commencer</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedItems).map(([location, locationItems]) => (
-            <div key={location}>
-              <h2 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                <span className="text-lg">📍</span>
-                {location || 'Non classé'}
-              </h2>
+        <>
+          <p className="text-xs text-gray-500 mb-2">Maintenez et glissez pour réordonner</p>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={sortedItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
               <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
-                {locationItems.map((item) => (
-                  <div key={item.id} className="p-3 flex items-center gap-2">
-                    <button
-                      onClick={() => navigate(`/items/${item.id}`)}
-                      className="flex-1 min-w-0 text-left"
-                    >
-                      <div className="font-medium truncate">{item.name}</div>
-                      <div className="text-xs text-gray-500">
-                        objectif: {item.targetQuantity} {item.unit} · {item.storeSection || 'Aucun magasin'}
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleDecrement(item)}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.currentQuantity}
-                        onChange={(e) => handleQuantityChange(item, e.target.value)}
-                        className="w-14 h-10 px-1 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        onClick={() => handleIncrement(item)}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-bold text-xl transition-colors"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                {sortedItems.map((item) => (
+                  <SortableInventoryItem
+                    key={item.id}
+                    item={item}
+                    onEdit={() => navigate(`/items/${item.id}`)}
+                    onIncrement={() => handleIncrement(item)}
+                    onDecrement={() => handleDecrement(item)}
+                    onQuantityChange={(value) => handleQuantityChange(item, value)}
+                  />
                 ))}
               </div>
-            </div>
-          ))}
-        </div>
+            </SortableContext>
+          </DndContext>
+        </>
       )}
     </div>
   )

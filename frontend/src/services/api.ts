@@ -53,6 +53,12 @@ export async function deleteItem(id: string): Promise<void> {
   await api.delete(`/items/${id}`)
 }
 
+export async function reorderItems(
+  items: { id: string; homeOrder?: number; storeOrder?: number }[]
+): Promise<void> {
+  await api.post('/items/reorder', { items })
+}
+
 export async function createTemporaryItem(name: string, quantity: number = 1, unit: string = 'unite(s)'): Promise<StockItem> {
   const { data } = await api.post('/items/temporary', { name, quantity, unit })
   return data

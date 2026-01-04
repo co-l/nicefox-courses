@@ -123,6 +123,20 @@ export async function deleteItem(id: string, userId: string): Promise<boolean> {
   return true
 }
 
+export async function reorderItems(
+  userId: string,
+  items: { id: string; homeOrder?: number; storeOrder?: number }[]
+): Promise<void> {
+  for (const item of items) {
+    const updates: UpdateItemRequest = {}
+    if (item.homeOrder !== undefined) updates.homeOrder = item.homeOrder
+    if (item.storeOrder !== undefined) updates.storeOrder = item.storeOrder
+    if (Object.keys(updates).length > 0) {
+      await updateItem(item.id, userId, updates)
+    }
+  }
+}
+
 export async function deleteTemporaryItems(userId: string): Promise<void> {
   const db = getDb()
   // Get all temporary items first (can't filter in WHERE)
