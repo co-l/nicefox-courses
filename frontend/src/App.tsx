@@ -3,7 +3,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { Home } from './pages/Home'
-import { Items } from './pages/Items'
 import { ItemForm } from './pages/ItemForm'
 import { ImportCSV } from './pages/ImportCSV'
 import { Inventory } from './pages/Inventory'
@@ -17,11 +16,10 @@ function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/items" element={<Items />} />
+              <Route path="/inventory" element={<Inventory />} />
               <Route path="/items/new" element={<ItemForm />} />
               <Route path="/items/:id" element={<ItemForm />} />
               <Route path="/items/import" element={<ImportCSV />} />
-              <Route path="/inventory" element={<Inventory />} />
               <Route path="/shopping" element={<Shopping />} />
             </Routes>
           </Layout>
