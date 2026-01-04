@@ -7,7 +7,6 @@ import { config } from './config.js'
 import { stockUserMiddleware } from './services/user.js'
 import { initDatabase, testConnection } from './db/graphdb.js'
 import itemsRouter from './routes/items.js'
-import sessionsRouter from './routes/sessions.js'
 
 const app = express()
 
@@ -31,7 +30,6 @@ app.get('/api/auth/me', authMiddleware({ jwtSecret: config.jwtSecret }), (req, r
 
 // Protected API routes with stockUser
 app.use('/api/items', authMiddleware({ jwtSecret: config.jwtSecret }), stockUserMiddleware(), itemsRouter)
-app.use('/api/sessions', authMiddleware({ jwtSecret: config.jwtSecret }), stockUserMiddleware(), sessionsRouter)
 
 // Start server
 async function start() {

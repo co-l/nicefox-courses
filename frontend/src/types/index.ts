@@ -21,28 +21,6 @@ export interface StockItem {
   updatedAt: string
 }
 
-export interface StockSession {
-  id: string
-  userId: string
-  status: 'pre-shopping' | 'shopping' | 'completed'
-  createdAt: string
-  completedAt?: string
-}
-
-export interface StockSessionItem {
-  id: string
-  sessionId: string
-  itemId: string
-  countedQuantity: number | null
-  toBuy: number
-  purchased: boolean
-  item: StockItem
-}
-
-export interface SessionWithItems extends StockSession {
-  items: StockSessionItem[]
-}
-
 export interface CreateItemRequest {
   name: string
   targetQuantity: number

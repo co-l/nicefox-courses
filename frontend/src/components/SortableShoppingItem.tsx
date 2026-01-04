@@ -1,13 +1,20 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import type { StockSessionItem } from '../types'
+import type { StockItem } from '../types'
+
+interface ShoppingItem {
+  item: StockItem
+  toBuy: number
+  purchased: boolean
+}
 
 interface SortableShoppingItemProps {
-  item: StockSessionItem
+  shoppingItem: ShoppingItem
   onTogglePurchased: () => void
 }
 
-export function SortableShoppingItem({ item, onTogglePurchased }: SortableShoppingItemProps) {
+export function SortableShoppingItem({ shoppingItem, onTogglePurchased }: SortableShoppingItemProps) {
+  const { item, toBuy, purchased } = shoppingItem
   const {
     attributes,
     listeners,
@@ -15,7 +22,7 @@ export function SortableShoppingItem({ item, onTogglePurchased }: SortableShoppi
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.itemId })
+  } = useSortable({ id: item.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -47,25 +54,25 @@ export function SortableShoppingItem({ item, onTogglePurchased }: SortableShoppi
       >
         <div
           className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-            item.purchased
+            purchased
               ? 'bg-green-500 border-green-500 text-white'
               : 'border-gray-300'
           }`}
         >
-          {item.purchased && (
+          {purchased && (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
             </svg>
           )}
         </div>
-        <span className={`truncate ${item.purchased ? 'line-through text-gray-400' : ''}`}>
-          {item.item.name}
+        <span className={`truncate ${purchased ? 'line-through text-gray-400' : ''}`}>
+          {item.name}
         </span>
       </button>
 
       {/* Quantity */}
-      <span className={`text-sm whitespace-nowrap ${item.purchased ? 'text-gray-400' : 'text-gray-600'}`}>
-        {item.toBuy} {item.item.unit}
+      <span className={`text-sm whitespace-nowrap ${purchased ? 'text-gray-400' : 'text-gray-600'}`}>
+        {toBuy} {item.unit}
       </span>
     </div>
   )

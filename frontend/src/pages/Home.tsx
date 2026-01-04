@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentSession, createSession, createTemporaryItem, getItems, deleteItem } from '../services/api'
-import type { SessionWithItems, StockItem } from '../types'
+import { createTemporaryItem, getItems, deleteItem } from '../services/api'
+import type { StockItem } from '../types'
 
 type Unit = 'kg' | 'unité(s)'
 
 export function Home() {
   const navigate = useNavigate()
-  const [currentSession, setCurrentSession] = useState<SessionWithItems | null>(null)
   const [temporaryItems, setTemporaryItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [tempItemName, setTempItemName] = useState('')
   const [tempItemQuantity, setTempItemQuantity] = useState('1')
   const [tempItemUnit, setTempItemUnit] = useState<Unit>('unité(s)')
@@ -22,38 +20,12 @@ export function Home() {
 
   async function loadData() {
     try {
-      const [session, items] = await Promise.all([
-        getCurrentSession(),
-        getItems(),
-      ])
-      setCurrentSession(session)
+      const items = await getItems()
       setTemporaryItems(items.filter(i => i.isTemporary))
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleNewSession = async () => {
-    if (currentSession) {
-      if (currentSession.status === 'pre-shopping') {
-        navigate('/pre-shopping')
-      } else {
-        navigate('/shopping')
-      }
-      return
-    }
-
-    setCreating(true)
-    try {
-      await createSession()
-      navigate('/pre-shopping')
-    } catch (error) {
-      console.error('Failed to create session:', error)
-      alert('Erreur lors de la création de la session')
-    } finally {
-      setCreating(false)
     }
   }
 
@@ -70,9 +42,6 @@ export function Home() {
       setTempItemName('')
       setTempItemQuantity('1')
       setTempItemUnit('unité(s)')
-      // Reload session to get updated items
-      const session = await getCurrentSession()
-      setCurrentSession(session)
     } catch (error) {
       console.error('Failed to add temporary item:', error)
       alert('Erreur lors de l\'ajout')
@@ -100,38 +69,26 @@ export function Home() {
 
   return (
     <div className="space-y-6">
-      {/* Session actions */}
-      <div className="space-y-4">
+      {/* Navigation buttons */}
+      <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={handleNewSession}
-          disabled={creating}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+          onClick={() => navigate('/inventory')}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 px-4 rounded-lg transition-colors flex flex-col items-center gap-2"
         >
-          {creating ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          ) : currentSession ? (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Continuer la session en cours
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Nouvelle session de courses
-            </>
-          )}
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          Inventaire
         </button>
-
-        {currentSession && (
-          <p className="text-center text-sm text-gray-500">
-            Session en cours : {currentSession.status === 'pre-shopping' ? 'Inventaire' : 'Courses'}
-          </p>
-        )}
+        <button
+          onClick={() => navigate('/shopping')}
+          className="bg-green-600 hover:bg-green-700 text-white font-medium py-4 px-4 rounded-lg transition-colors flex flex-col items-center gap-2"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          Liste de courses
+        </button>
       </div>
 
       {/* Temporary items section */}
@@ -220,17 +177,9 @@ export function Home() {
           </div>
         </form>
         <p className="text-xs text-gray-500 mt-3">
-          Ces articles seront supprimés après la session de courses
+          Ces articles seront supprimés une fois achetés
         </p>
       </div>
-
-      {/* Manage items link */}
-      <button
-        onClick={() => navigate('/items')}
-        className="w-full text-sm text-gray-500 hover:text-gray-700 py-2 transition-colors"
-      >
-        Gérer les éléments
-      </button>
     </div>
   )
 }

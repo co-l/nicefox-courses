@@ -16,16 +16,20 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { getCurrentSession, updateSessionItem, updateSessionStatus, completeSession, reorderItems } from '../services/api'
-import type { SessionWithItems, StockSessionItem } from '../types'
+import { getItems, updateItem, reorderItems, deleteItem } from '../services/api'
+import type { StockItem } from '../types'
 import { SortableShoppingItem } from '../components/SortableShoppingItem'
+
+interface ShoppingItem {
+  item: StockItem
+  toBuy: number
+  purchased: boolean
+}
 
 export function Shopping() {
   const navigate = useNavigate()
-  const [session, setSession] = useState<SessionWithItems | null>(null)
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [completing, setCompleting] = useState(false)
-  const [goingBack, setGoingBack] = useState(false)
 
   // Sensors optimized for mobile touch
   const sensors = useSensors(
@@ -46,120 +50,102 @@ export function Shopping() {
   )
 
   useEffect(() => {
-    loadSession()
+    loadItems()
   }, [])
 
-  async function loadSession() {
+  async function loadItems() {
     try {
-      const data = await getCurrentSession()
-      if (!data) {
-        navigate('/')
-        return
-      }
-      if (data.status === 'pre-shopping') {
-        navigate('/pre-shopping')
-        return
-      }
-      if (data.status === 'completed') {
-        navigate('/')
-        return
-      }
-      setSession(data)
+      const items = await getItems()
+      // Build shopping list: items where currentQuantity < targetQuantity
+      const toBuyItems: ShoppingItem[] = items
+        .filter(item => item.currentQuantity < item.targetQuantity)
+        .sort((a, b) => a.storeOrder - b.storeOrder)
+        .map(item => ({
+          item,
+          toBuy: item.targetQuantity - item.currentQuantity,
+          purchased: false, // Reset purchased state on load
+        }))
+      setShoppingItems(toBuyItems)
     } catch (error) {
-      console.error('Failed to load session:', error)
-      navigate('/')
+      console.error('Failed to load items:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleTogglePurchased(item: StockSessionItem) {
+  async function handleTogglePurchased(shoppingItem: ShoppingItem) {
+    const newPurchased = !shoppingItem.purchased
+    
     // Optimistic update
-    setSession((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        items: prev.items.map((i) =>
-          i.itemId === item.itemId ? { ...i, purchased: !i.purchased } : i
-        ),
-      }
-    })
+    setShoppingItems((prev) =>
+      prev.map((si) =>
+        si.item.id === shoppingItem.item.id ? { ...si, purchased: newPurchased } : si
+      )
+    )
 
-    try {
-      await updateSessionItem(session!.id, item.itemId, { purchased: !item.purchased })
-    } catch (error) {
-      console.error('Failed to update item:', error)
-      loadSession()
+    // If marking as purchased, update currentQuantity to targetQuantity
+    if (newPurchased) {
+      try {
+        await updateItem(shoppingItem.item.id, {
+          currentQuantity: shoppingItem.item.targetQuantity,
+        })
+        // If it's a temporary item, delete it after purchase
+        if (shoppingItem.item.isTemporary) {
+          await deleteItem(shoppingItem.item.id)
+        }
+      } catch (error) {
+        console.error('Failed to update item:', error)
+        loadItems()
+      }
+    } else {
+      // If unmarking, reset currentQuantity to what it was before (0 for simplicity)
+      try {
+        await updateItem(shoppingItem.item.id, {
+          currentQuantity: shoppingItem.item.currentQuantity,
+        })
+      } catch (error) {
+        console.error('Failed to update item:', error)
+        loadItems()
+      }
     }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over || active.id === over.id || !session) return
+    if (!over || active.id === over.id) return
 
-    const currentItemsToBuy = session.items
-      .filter((i) => i.toBuy > 0)
-      .sort((a, b) => a.item.storeOrder - b.item.storeOrder)
+    const oldIndex = shoppingItems.findIndex((si) => si.item.id === active.id)
+    const newIndex = shoppingItems.findIndex((si) => si.item.id === over.id)
 
-    const oldIndex = currentItemsToBuy.findIndex((item) => item.itemId === active.id)
-    const newIndex = currentItemsToBuy.findIndex((item) => item.itemId === over.id)
-
-    const reorderedItems = arrayMove(currentItemsToBuy, oldIndex, newIndex)
+    const reorderedItems = arrayMove(shoppingItems, oldIndex, newIndex)
 
     // Update local state optimistically - update storeOrder on the item
-    const updatedSessionItems = reorderedItems.map((sessionItem, index) => ({
-      ...sessionItem,
+    const updatedShoppingItems = reorderedItems.map((si, index) => ({
+      ...si,
       item: {
-        ...sessionItem.item,
+        ...si.item,
         storeOrder: index,
       },
     }))
 
-    setSession((prev) => {
-      if (!prev) return prev
-      const otherItems = prev.items.filter((i) => i.toBuy <= 0)
-      return {
-        ...prev,
-        items: [...updatedSessionItems, ...otherItems],
-      }
-    })
+    setShoppingItems(updatedShoppingItems)
 
     // Persist to server - update storeOrder on items
     try {
       await reorderItems(
-        updatedSessionItems.map((sessionItem) => ({
-          id: sessionItem.itemId,
-          storeOrder: sessionItem.item.storeOrder,
+        updatedShoppingItems.map((si) => ({
+          id: si.item.id,
+          storeOrder: si.item.storeOrder,
         }))
       )
     } catch (error) {
       console.error('Failed to reorder items:', error)
-      loadSession()
+      loadItems()
     }
   }
 
-  async function handleGoBack() {
-    if (!session) return
-    setGoingBack(true)
-    try {
-      await updateSessionStatus(session.id, 'pre-shopping')
-      navigate('/pre-shopping')
-    } catch (error) {
-      console.error('Failed to go back:', error)
-      setGoingBack(false)
-    }
-  }
-
-  async function handleComplete() {
-    if (!session) return
-    setCompleting(true)
-    try {
-      await completeSession(session.id)
-      navigate('/')
-    } catch (error) {
-      console.error('Failed to complete session:', error)
-      setCompleting(false)
-    }
+  function handleDone() {
+    navigate('/')
   }
 
   if (loading) {
@@ -170,31 +156,11 @@ export function Shopping() {
     )
   }
 
-  if (!session) {
-    return null
-  }
-
-  // Filter items with toBuy > 0, sorted by storeOrder
-  const itemsToBuy = session.items
-    .filter((i) => i.toBuy > 0)
-    .sort((a, b) => a.item.storeOrder - b.item.storeOrder)
-
-  const purchasedCount = itemsToBuy.filter((i) => i.purchased).length
-  const totalCount = itemsToBuy.length
+  const purchasedCount = shoppingItems.filter((si) => si.purchased).length
+  const totalCount = shoppingItems.length
 
   return (
     <div>
-      <button
-        onClick={handleGoBack}
-        disabled={goingBack}
-        className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
-      >
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Inventaire
-      </button>
-
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Liste de courses</h1>
         <span className="text-sm font-medium text-gray-600">
@@ -202,16 +168,18 @@ export function Shopping() {
         </span>
       </div>
 
-      {itemsToBuy.length === 0 ? (
+      {shoppingItems.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-4xl mb-4">🎉</div>
           <p className="text-gray-600 mb-4">Rien à acheter !</p>
+          <p className="text-sm text-gray-500 mb-6">
+            Tous vos articles sont en stock.
+          </p>
           <button
-            onClick={handleComplete}
-            disabled={completing}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            onClick={() => navigate('/')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
           >
-            {completing ? 'Finalisation...' : 'Terminer'}
+            Retour
           </button>
         </div>
       ) : (
@@ -224,15 +192,15 @@ export function Shopping() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={itemsToBuy.map((i) => i.itemId)}
+              items={shoppingItems.map((si) => si.item.id)}
               strategy={verticalListSortingStrategy}
             >
               <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100 mb-6">
-                {itemsToBuy.map((item) => (
+                {shoppingItems.map((shoppingItem) => (
                   <SortableShoppingItem
-                    key={item.itemId}
-                    item={item}
-                    onTogglePurchased={() => handleTogglePurchased(item)}
+                    key={shoppingItem.item.id}
+                    shoppingItem={shoppingItem}
+                    onTogglePurchased={() => handleTogglePurchased(shoppingItem)}
                   />
                 ))}
               </div>
@@ -240,20 +208,13 @@ export function Shopping() {
           </DndContext>
 
           <button
-            onClick={handleComplete}
-            disabled={completing || goingBack}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            onClick={handleDone}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            {completing ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Terminer
-              </>
-            )}
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Terminer
           </button>
         </>
       )}

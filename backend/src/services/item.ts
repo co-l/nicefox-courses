@@ -31,3 +31,7 @@ export async function reorderItems(
 ): Promise<void> {
   return itemQueries.reorderItems(userId, items)
 }
+
+export async function deleteTemporaryItems(userId: string): Promise<void> {
+  return itemQueries.deleteTemporaryItems(userId)
+}

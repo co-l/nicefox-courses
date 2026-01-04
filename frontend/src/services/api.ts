@@ -2,11 +2,8 @@ import axios, { InternalAxiosRequestConfig } from 'axios'
 import type {
   AuthUser,
   StockItem,
-  SessionWithItems,
   CreateItemRequest,
   UpdateItemRequest,
-  StockSession,
-  StockSessionItem,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3100/api'
@@ -67,47 +64,11 @@ export async function createTemporaryItem(name: string, quantity: number = 1, un
   return data
 }
 
-// Sessions
-export async function getCurrentSession(): Promise<SessionWithItems | null> {
-  try {
-    const { data } = await api.get('/sessions/current')
-    return data
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return null
-    }
-    throw error
-  }
-}
-
-export async function getSession(id: string): Promise<SessionWithItems> {
-  const { data } = await api.get(`/sessions/${id}`)
+export async function markItemPurchased(id: string, purchased: boolean): Promise<StockItem> {
+  const { data } = await api.post(`/items/${id}/mark-purchased`, { purchased })
   return data
 }
 
-export async function createSession(): Promise<SessionWithItems> {
-  const { data } = await api.post('/sessions')
-  return data
-}
-
-export async function updateSessionStatus(
-  id: string,
-  status: StockSession['status']
-): Promise<StockSession> {
-  const { data } = await api.patch(`/sessions/${id}/status`, { status })
-  return data
-}
-
-export async function updateSessionItem(
-  sessionId: string,
-  itemId: string,
-  update: { countedQuantity?: number | null; purchased?: boolean }
-): Promise<StockSessionItem> {
-  const { data } = await api.patch(`/sessions/${sessionId}/items/${itemId}`, update)
-  return data
-}
-
-export async function completeSession(id: string): Promise<StockSession> {
-  const { data } = await api.post(`/sessions/${id}/complete`)
-  return data
+export async function deleteTemporaryItems(): Promise<void> {
+  await api.delete('/items/temporary')
 }

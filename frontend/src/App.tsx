@@ -6,7 +6,7 @@ import { Home } from './pages/Home'
 import { Items } from './pages/Items'
 import { ItemForm } from './pages/ItemForm'
 import { ImportCSV } from './pages/ImportCSV'
-import { PreShopping } from './pages/PreShopping'
+import { Inventory } from './pages/Inventory'
 import { Shopping } from './pages/Shopping'
 
 function App() {
@@ -21,7 +21,7 @@ function App() {
               <Route path="/items/new" element={<ItemForm />} />
               <Route path="/items/:id" element={<ItemForm />} />
               <Route path="/items/import" element={<ImportCSV />} />
-              <Route path="/pre-shopping" element={<PreShopping />} />
+              <Route path="/inventory" element={<Inventory />} />
               <Route path="/shopping" element={<Shopping />} />
             </Routes>
           </Layout>

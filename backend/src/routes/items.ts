@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express'
 import * as itemService from '../services/item.js'
-import * as sessionService from '../services/session.js'
 import type { CreateItemRequest, UpdateItemRequest, ReorderItemsRequest } from '../types/index.js'
 
 const router = Router()
@@ -101,7 +100,7 @@ router.post('/reorder', async (req: Request, res: Response) => {
   }
 })
 
-// POST /api/items/temporary - Create temporary item and add to current session
+// POST /api/items/temporary - Create temporary item for shopping list
 router.post('/temporary', async (req: Request, res: Response) => {
   try {
     const { name, quantity = 1, unit = 'unité(s)' } = req.body as { name: string; quantity?: number; unit?: string }
@@ -111,21 +110,52 @@ router.post('/temporary', async (req: Request, res: Response) => {
       return
     }
 
-    // Create temporary item
+    // Create temporary item with currentQuantity = 0 so it appears in shopping list
     const item = await itemService.createItem(req.stockUser!.id, {
       name: name.trim(),
       targetQuantity: quantity,
+      currentQuantity: 0,
       unit,
       isTemporary: true,
     })
-
-    // Add to current session if one exists
-    await sessionService.addSessionItemForItem(req.stockUser!.id, item.id, quantity)
 
     res.status(201).json(item)
   } catch (error) {
     console.error('Failed to create temporary item:', error)
     res.status(500).json({ error: 'Failed to create temporary item' })
+  }
+})
+
+// POST /api/items/:id/mark-purchased - Mark item as purchased (set currentQuantity = targetQuantity)
+router.post('/:id/mark-purchased', async (req: Request, res: Response) => {
+  try {
+    const { purchased } = req.body as { purchased: boolean }
+    const item = await itemService.getItemById(req.params.id, req.stockUser!.id)
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' })
+      return
+    }
+    
+    // If marking as purchased, set current = target; if unmarking, set current = 0
+    const newCurrentQuantity = purchased ? item.targetQuantity : 0
+    const updated = await itemService.updateItem(req.params.id, req.stockUser!.id, {
+      currentQuantity: newCurrentQuantity,
+    })
+    res.json(updated)
+  } catch (error) {
+    console.error('Failed to mark item as purchased:', error)
+    res.status(500).json({ error: 'Failed to mark item as purchased' })
+  }
+})
+
+// DELETE /api/items/temporary - Delete all temporary items
+router.delete('/temporary', async (req: Request, res: Response) => {
+  try {
+    await itemService.deleteTemporaryItems(req.stockUser!.id)
+    res.status(204).send()
+  } catch (error) {
+    console.error('Failed to delete temporary items:', error)
+    res.status(500).json({ error: 'Failed to delete temporary items' })
   }
 })
 
