@@ -20,11 +20,11 @@ export function Layout({ children }: LayoutProps) {
       <header className="bg-white shadow-sm">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="text-xl font-bold text-gray-900">
-            Stock Alimentaire
+            NiceFox Courses
           </Link>
           {user && (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">{user.email}</span>
+              
               <button
                 onClick={logout}
                 className="text-sm text-gray-400 hover:text-gray-600"

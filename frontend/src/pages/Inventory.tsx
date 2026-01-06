@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getItems, updateItem, deleteItem, reorderItems } from '../services/api'
+import { ItemFormModal } from '../components/ItemFormModal'
 import type { StockItem } from '../types'
 
 interface SortableInventoryItemProps {
@@ -111,6 +112,8 @@ export function Inventory() {
   const navigate = useNavigate()
   const [items, setItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   // Touch-optimized sensors
   const sensors = useSensors(
@@ -220,6 +223,25 @@ export function Inventory() {
     }
   }
 
+  function openEditModal(itemId: string) {
+    setEditingItemId(itemId)
+    setModalOpen(true)
+  }
+
+  function openCreateModal() {
+    setEditingItemId(null)
+    setModalOpen(true)
+  }
+
+  function handleModalClose() {
+    setModalOpen(false)
+    setEditingItemId(null)
+  }
+
+  function handleItemSaved() {
+    loadItems()
+  }
+
   async function handleDeleteAll() {
     if (!confirm(`Supprimer les ${items.length} éléments ?`)) return
     try {
@@ -267,7 +289,7 @@ export function Inventory() {
           </svg>
         </button>
         <button
-          onClick={() => navigate('/items/new')}
+          onClick={openCreateModal}
           className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-1"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -296,7 +318,7 @@ export function Inventory() {
                   <SortableInventoryItem
                     key={item.id}
                     item={item}
-                    onEdit={() => navigate(`/items/${item.id}`)}
+                    onEdit={() => openEditModal(item.id)}
                     onDelete={() => handleDelete(item)}
                     onIncrement={() => handleIncrement(item)}
                     onDecrement={() => handleDecrement(item)}
@@ -308,6 +330,13 @@ export function Inventory() {
           </DndContext>
         </>
       )}
+
+      <ItemFormModal
+        isOpen={modalOpen}
+        onClose={handleModalClose}
+        itemId={editingItemId}
+        onSaved={handleItemSaved}
+      />
     </div>
   )
 }
