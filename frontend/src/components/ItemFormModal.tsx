@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Modal } from './Modal'
 import { getItem, createItem, updateItem } from '../services/api'
-import { STORES, type CreateItemRequest, type StockItem } from '../types'
+import { STORES, type CreateItemRequest } from '../types'
 
 interface ItemFormModalProps {
   isOpen: boolean
