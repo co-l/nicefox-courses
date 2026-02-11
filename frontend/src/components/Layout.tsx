@@ -16,10 +16,10 @@ export function Layout({ children }: LayoutProps) {
   const isMainPage = isHome || isInventory || isShopping
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="bg-slate-900/95 shadow-sm backdrop-blur border-b border-slate-800">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="text-xl font-bold text-gray-900">
+          <Link to="/" className="text-xl font-bold text-slate-100">
             NiceFox Courses
           </Link>
           {user && (
@@ -27,7 +27,7 @@ export function Layout({ children }: LayoutProps) {
               
               <button
                 onClick={logout}
-                className="text-sm text-gray-400 hover:text-gray-600"
+                className="text-sm text-slate-400 hover:text-slate-100 transition-colors"
                 title="Déconnexion"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -40,13 +40,13 @@ export function Layout({ children }: LayoutProps) {
         {/* Navigation tabs for main pages */}
         {isMainPage && (
           <div className="max-w-lg mx-auto px-4 pb-2">
-            <div className="flex rounded-lg bg-gray-100 p-1">
+            <div className="flex rounded-lg bg-slate-800/80 p-1 border border-slate-700">
               <Link
                 to="/"
                 className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
                   isHome
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-slate-700 text-slate-100 shadow-sm'
+                    : 'text-slate-300 hover:text-slate-100'
                 }`}
               >
                 Accueil
@@ -55,8 +55,8 @@ export function Layout({ children }: LayoutProps) {
                 to="/inventory"
                 className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
                   isInventory
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-slate-700 text-slate-100 shadow-sm'
+                    : 'text-slate-300 hover:text-slate-100'
                 }`}
               >
                 Inventaire
@@ -65,8 +65,8 @@ export function Layout({ children }: LayoutProps) {
                 to="/shopping"
                 className={`flex-1 py-2 text-center text-sm font-medium rounded-md transition-colors ${
                   isShopping
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-slate-700 text-slate-100 shadow-sm'
+                    : 'text-slate-300 hover:text-slate-100'
                 }`}
               >
                 Courses
@@ -79,7 +79,7 @@ export function Layout({ children }: LayoutProps) {
         {!isMainPage && (
           <Link
             to="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+            className="inline-flex items-center text-sm text-slate-300 hover:text-slate-100 mb-4"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
