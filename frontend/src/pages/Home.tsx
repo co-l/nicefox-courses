@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import {
   cancelAccountShareRequest,
   createTemporaryItem,
@@ -23,6 +24,7 @@ type Unit = 'kg' | 'unité(s)'
 
 export function Home() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [temporaryItems, setTemporaryItems] = useState<StockItem[]>([])
   const [loading, setLoading] = useState(true)
   const [tempItemName, setTempItemName] = useState('')
@@ -40,11 +42,20 @@ export function Home() {
     loadData()
   }, [])
 
+  const applyHomeData = (items: StockItem[], status: AccountShareStatusView): void => {
+    setTemporaryItems(items.filter((item) => item.isTemporary))
+    setShareStatus(status)
+  }
+
+  const fetchHomeData = async (): Promise<{ items: StockItem[]; status: AccountShareStatusView }> => {
+    const [items, status] = await Promise.all([getItems(), getAccountShareStatus()])
+    return { items, status }
+  }
+
   async function loadData() {
     try {
-      const [items, status] = await Promise.all([getItems(), getAccountShareStatus()])
-      setTemporaryItems(items.filter(i => i.isTemporary))
-      setShareStatus(status)
+      const { items, status } = await fetchHomeData()
+      applyHomeData(items, status)
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -55,6 +66,11 @@ export function Home() {
   async function refreshShareStatus() {
     const status = await getAccountShareStatus()
     setShareStatus(status)
+  }
+
+  async function refreshHomeData() {
+    const { items, status } = await fetchHomeData()
+    applyHomeData(items, status)
   }
 
   const handleAddTemporaryItem = async (e: React.FormEvent) => {
@@ -102,7 +118,7 @@ export function Home() {
 
   const shareButtonLabel =
     linkedShare && shareStatus?.partnerEmail
-      ? `Compte partage avec ${shareStatus.partnerEmail}`
+      ? `Compte partagé avec ${shareStatus.partnerEmail}`
       : 'Partager ce compte'
 
   async function handleCreateShareRequest(e: React.FormEvent) {
@@ -130,7 +146,7 @@ export function Home() {
       setShareModalOpen(false)
     } catch (error) {
       console.error('Failed to cancel account share request:', error)
-      alert('Erreur lors de l annulation')
+      alert("Erreur lors de l'annulation")
     } finally {
       setShareActionLoading(false)
     }
@@ -142,10 +158,14 @@ export function Home() {
     setIncomingActionLoading(true)
     try {
       await respondToAccountShare(incomingShare.id, decision)
-      await refreshShareStatus()
+      if (decision === 'accept') {
+        await refreshHomeData()
+      } else {
+        await refreshShareStatus()
+      }
     } catch (error) {
       console.error('Failed to respond to account share request:', error)
-      alert('Erreur lors de la reponse')
+      alert('Erreur lors de la réponse')
     } finally {
       setIncomingActionLoading(false)
     }
@@ -155,11 +175,11 @@ export function Home() {
     setShareActionLoading(true)
     try {
       await stopAccountShare()
-      await refreshShareStatus()
+      await refreshHomeData()
       setShareModalOpen(false)
     } catch (error) {
       console.error('Failed to stop account sharing:', error)
-      alert('Erreur lors de l arret du partage')
+      alert("Erreur lors de l'arrêt du partage")
     } finally {
       setShareActionLoading(false)
     }
@@ -321,7 +341,7 @@ export function Home() {
         {linkedShare ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-300">
-              Ce compte est partage avec {shareStatus?.partnerEmail}
+              Ce compte est partagé avec {shareStatus?.partnerEmail}
             </p>
             <button
               type="button"
@@ -329,13 +349,13 @@ export function Home() {
               disabled={shareActionLoading}
               className="w-full py-2 px-4 bg-red-700 hover:bg-red-600 disabled:bg-red-900 text-white rounded-lg transition-colors"
             >
-              Arreter de partager
+              Arrêter de partager
             </button>
           </div>
         ) : pendingShare ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-300">
-              Demande envoyee a {pendingShare.targetEmail}
+              Demande envoyée à {pendingShare.targetEmail}
             </p>
             <button
               type="button"
@@ -375,7 +395,7 @@ export function Home() {
         {incomingShare && (
           <div className="space-y-4">
             <p className="text-sm text-slate-200">
-              {incomingShare.ownerEmail} veut fusionner son compte avec le votre
+              {incomingShare.ownerEmail} veut fusionner son compte avec le vôtre
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -398,6 +418,12 @@ export function Home() {
           </div>
         )}
       </Modal>
+
+      {user && (
+        <p className="pt-1 text-center text-xs text-slate-500">
+          Connecté en tant que {user.email}
+        </p>
+      )}
     </div>
   )
 }

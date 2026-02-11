@@ -29,7 +29,18 @@ vi.mock('../services/api', () => ({
   stopAccountShare: vi.fn(),
 }))
 
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: {
+      id: 'user-1',
+      email: 'viewer@example.test',
+      role: 'user',
+    },
+  }),
+}))
+
 import {
+  getItems,
   getAccountShareStatus,
   requestAccountShare,
   cancelAccountShareRequest,
@@ -37,6 +48,7 @@ import {
   stopAccountShare,
 } from '../services/api'
 
+const mockedGetItems = vi.mocked(getItems)
 const mockedGetStatus = vi.mocked(getAccountShareStatus)
 const mockedRequest = vi.mocked(requestAccountShare)
 const mockedCancel = vi.mocked(cancelAccountShareRequest)
@@ -62,6 +74,7 @@ const status = (overrides: Partial<AccountShareStatusView> = {}): AccountShareSt
 describe('Home account sharing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockedGetItems.mockResolvedValue([])
     mockedGetStatus.mockResolvedValue(status())
   })
 
@@ -90,6 +103,8 @@ describe('Home account sharing', () => {
     await waitFor(() => {
       expect(mockedRequest).toHaveBeenCalledWith('target@example.test')
     })
+
+    expect(screen.getByText('Connecté en tant que viewer@example.test')).toBeInTheDocument()
   })
 
   it('shows pending request and lets owner cancel it', async () => {
@@ -147,23 +162,64 @@ describe('Home account sharing', () => {
     })
   })
 
-  it('shows incoming request modal with Accepter and Refuser', async () => {
-    mockedGetStatus.mockResolvedValue(
-      status({
-        incomingRequests: [
-          {
+  it('shows incoming request modal and refreshes shared content on accept', async () => {
+    mockedGetStatus.mockReset()
+    mockedGetStatus
+      .mockResolvedValueOnce(
+        status({
+          incomingRequests: [
+            {
+              id: 'share-1',
+              ownerUserId: 'owner-1',
+              ownerAuthUserId: 'auth-owner-1',
+              ownerEmail: 'owner@example.test',
+              targetEmail: 'target@example.test',
+              status: 'pending',
+              createdAt: '2026-01-01T10:00:00.000Z',
+              updatedAt: '2026-01-01T10:00:00.000Z',
+            },
+          ],
+        })
+      )
+      .mockResolvedValue(
+        status({
+          role: 'target',
+          partnerEmail: 'owner@example.test',
+          outgoingRequest: {
             id: 'share-1',
             ownerUserId: 'owner-1',
             ownerAuthUserId: 'auth-owner-1',
             ownerEmail: 'owner@example.test',
             targetEmail: 'target@example.test',
-            status: 'pending',
+            status: 'accepted',
+            targetAuthUserId: 'auth-target-1',
+            targetUserId: 'target-1',
             createdAt: '2026-01-01T10:00:00.000Z',
-            updatedAt: '2026-01-01T10:00:00.000Z',
+            updatedAt: '2026-01-01T10:10:00.000Z',
+            respondedAt: '2026-01-01T10:10:00.000Z',
           },
-        ],
-      })
-    )
+        })
+      )
+    mockedGetItems.mockReset()
+    mockedGetItems
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([
+        {
+          id: 'tmp-accepted',
+          userId: 'owner-1',
+          name: 'Temp from owner',
+          targetQuantity: 1,
+          currentQuantity: 0,
+          unit: 'unite(s)',
+          homeLocation: '',
+          homeOrder: 0,
+          storeSection: 'Billa',
+          storeOrder: 0,
+          isTemporary: true,
+          createdAt: '2026-01-01T10:00:00.000Z',
+          updatedAt: '2026-01-01T10:00:00.000Z',
+        },
+      ])
     mockedRespond.mockResolvedValue({
       id: 'share-1',
       ownerUserId: 'owner-1',
@@ -181,7 +237,7 @@ describe('Home account sharing', () => {
     renderHome()
 
     expect(
-      await screen.findByText('owner@example.test veut fusionner son compte avec le votre')
+      await screen.findByText('owner@example.test veut fusionner son compte avec le vôtre')
     ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Accepter' }))
@@ -189,6 +245,13 @@ describe('Home account sharing', () => {
     await waitFor(() => {
       expect(mockedRespond).toHaveBeenCalledWith('share-1', 'accept')
     })
+
+    expect(await screen.findByText('Temp from owner')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('button', {
+        name: 'Compte partagé avec owner@example.test',
+      })
+    ).toBeInTheDocument()
   })
 
   it('shows shared state and lets participants stop sharing', async () => {
@@ -228,10 +291,10 @@ describe('Home account sharing', () => {
     renderHome()
 
     const shareButton = await screen.findByRole('button', {
-      name: 'Compte partage avec owner@example.test',
+      name: 'Compte partagé avec owner@example.test',
     })
     fireEvent.click(shareButton)
-    fireEvent.click(screen.getByRole('button', { name: 'Arreter de partager' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Arrêter de partager' }))
 
     await waitFor(() => {
       expect(mockedStop).toHaveBeenCalledTimes(1)
