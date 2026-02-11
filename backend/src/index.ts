@@ -7,6 +7,7 @@ import { config } from './config.js'
 import { stockUserMiddleware } from './services/user.js'
 import { initDatabase, testConnection } from './db/graphdb.js'
 import itemsRouter from './routes/items.js'
+import { securityHeadersMiddleware } from './securityHeaders.js'
 
 const app = express()
 
@@ -15,6 +16,8 @@ app.use(cors({
   origin: config.frontendUrl,
   credentials: true,
 }))
+app.disable('x-powered-by')
+app.use(securityHeadersMiddleware())
 app.use(express.json())
 app.use(cookieParser())
 
