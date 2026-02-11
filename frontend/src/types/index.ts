@@ -44,3 +44,28 @@ export interface UpdateItemRequest {
   storeSection?: string
   storeOrder?: number
 }
+
+export type AccountShareStatus = 'pending' | 'accepted' | 'refused' | 'cancelled' | 'stopped'
+
+export interface AccountShare {
+  id: string
+  ownerUserId: string
+  ownerAuthUserId: string
+  ownerEmail: string
+  targetEmail: string
+  status: AccountShareStatus
+  targetAuthUserId?: string
+  targetUserId?: string
+  createdAt: string
+  updatedAt: string
+  respondedAt?: string
+  stoppedAt?: string
+}
+
+export interface AccountShareStatusView {
+  role: 'none' | 'owner' | 'target'
+  effectiveOwnerUserId: string
+  partnerEmail: string | null
+  outgoingRequest: AccountShare | null
+  incomingRequests: AccountShare[]
+}

@@ -1,7 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createTemporaryItem, getItems, deleteItem } from '../services/api'
-import { STORES, type StockItem, type Store } from '../types'
+import {
+  cancelAccountShareRequest,
+  createTemporaryItem,
+  deleteItem,
+  getAccountShareStatus,
+  getItems,
+  requestAccountShare,
+  respondToAccountShare,
+  stopAccountShare,
+} from '../services/api'
+import { Modal } from '../components/Modal'
+import {
+  STORES,
+  type AccountShare,
+  type AccountShareStatusView,
+  type StockItem,
+  type Store,
+} from '../types'
 
 type Unit = 'kg' | 'unité(s)'
 
@@ -14,6 +30,11 @@ export function Home() {
   const [tempItemUnit, setTempItemUnit] = useState<Unit>('unité(s)')
   const [tempItemStore, setTempItemStore] = useState<Store>(STORES[0])
   const [addingItem, setAddingItem] = useState(false)
+  const [shareStatus, setShareStatus] = useState<AccountShareStatusView | null>(null)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareActionLoading, setShareActionLoading] = useState(false)
+  const [incomingActionLoading, setIncomingActionLoading] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -21,13 +42,19 @@ export function Home() {
 
   async function loadData() {
     try {
-      const items = await getItems()
+      const [items, status] = await Promise.all([getItems(), getAccountShareStatus()])
       setTemporaryItems(items.filter(i => i.isTemporary))
+      setShareStatus(status)
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  async function refreshShareStatus() {
+    const status = await getAccountShareStatus()
+    setShareStatus(status)
   }
 
   const handleAddTemporaryItem = async (e: React.FormEvent) => {
@@ -58,6 +85,83 @@ export function Home() {
       setTemporaryItems(prev => prev.filter(i => i.id !== id))
     } catch (error) {
       console.error('Failed to delete item:', error)
+    }
+  }
+
+  const linkedShare: AccountShare | null =
+    shareStatus?.outgoingRequest?.status === 'accepted'
+      ? shareStatus.outgoingRequest
+      : null
+
+  const pendingShare: AccountShare | null =
+    shareStatus?.outgoingRequest?.status === 'pending'
+      ? shareStatus.outgoingRequest
+      : null
+
+  const incomingShare: AccountShare | null = shareStatus?.incomingRequests[0] ?? null
+
+  const shareButtonLabel =
+    linkedShare && shareStatus?.partnerEmail
+      ? `Compte partage avec ${shareStatus.partnerEmail}`
+      : 'Partager ce compte'
+
+  async function handleCreateShareRequest(e: React.FormEvent) {
+    e.preventDefault()
+    if (shareActionLoading) return
+
+    setShareActionLoading(true)
+    try {
+      await requestAccountShare(shareEmail)
+      setShareEmail('')
+      await refreshShareStatus()
+    } catch (error) {
+      console.error('Failed to request account share:', error)
+      alert('Erreur lors de la demande de partage')
+    } finally {
+      setShareActionLoading(false)
+    }
+  }
+
+  async function handleCancelShareRequest() {
+    setShareActionLoading(true)
+    try {
+      await cancelAccountShareRequest()
+      await refreshShareStatus()
+      setShareModalOpen(false)
+    } catch (error) {
+      console.error('Failed to cancel account share request:', error)
+      alert('Erreur lors de l annulation')
+    } finally {
+      setShareActionLoading(false)
+    }
+  }
+
+  async function handleIncomingDecision(decision: 'accept' | 'refuse') {
+    if (!incomingShare) return
+
+    setIncomingActionLoading(true)
+    try {
+      await respondToAccountShare(incomingShare.id, decision)
+      await refreshShareStatus()
+    } catch (error) {
+      console.error('Failed to respond to account share request:', error)
+      alert('Erreur lors de la reponse')
+    } finally {
+      setIncomingActionLoading(false)
+    }
+  }
+
+  async function handleStopSharing() {
+    setShareActionLoading(true)
+    try {
+      await stopAccountShare()
+      await refreshShareStatus()
+      setShareModalOpen(false)
+    } catch (error) {
+      console.error('Failed to stop account sharing:', error)
+      alert('Erreur lors de l arret du partage')
+    } finally {
+      setShareActionLoading(false)
     }
   }
 
@@ -198,6 +302,102 @@ export function Home() {
           Ces articles seront supprimés une fois achetés
         </p>
       </div>
+
+      <div className="pt-2">
+        <button
+          type="button"
+          onClick={() => setShareModalOpen(true)}
+          className="w-full text-sm bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-100 font-medium py-3 px-4 rounded-lg transition-colors"
+        >
+          {shareButtonLabel}
+        </button>
+      </div>
+
+      <Modal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        title="Partage de compte"
+      >
+        {linkedShare ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-300">
+              Ce compte est partage avec {shareStatus?.partnerEmail}
+            </p>
+            <button
+              type="button"
+              onClick={handleStopSharing}
+              disabled={shareActionLoading}
+              className="w-full py-2 px-4 bg-red-700 hover:bg-red-600 disabled:bg-red-900 text-white rounded-lg transition-colors"
+            >
+              Arreter de partager
+            </button>
+          </div>
+        ) : pendingShare ? (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-300">
+              Demande envoyee a {pendingShare.targetEmail}
+            </p>
+            <button
+              type="button"
+              onClick={handleCancelShareRequest}
+              disabled={shareActionLoading}
+              className="w-full py-2 px-4 border border-slate-600 hover:bg-slate-800 disabled:opacity-60 text-slate-100 rounded-lg transition-colors"
+            >
+              Annuler la demande
+            </button>
+          </div>
+        ) : (
+          <form className="space-y-3" onSubmit={handleCreateShareRequest}>
+            <label className="block text-sm text-slate-300">Email du compte</label>
+            <input
+              type="text"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              placeholder="Email du compte"
+              className="w-full px-3 py-2 border border-slate-600 bg-slate-950 text-slate-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={shareActionLoading || shareEmail.trim() === ''}
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-900 text-white rounded-lg transition-colors"
+            >
+              Envoyer
+            </button>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={incomingShare !== null}
+        onClose={() => undefined}
+        title="Fusion de compte"
+      >
+        {incomingShare && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-200">
+              {incomingShare.ownerEmail} veut fusionner son compte avec le votre
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleIncomingDecision('accept')}
+                disabled={incomingActionLoading}
+                className="py-2 px-4 bg-green-700 hover:bg-green-600 disabled:bg-green-900 text-white rounded-lg transition-colors"
+              >
+                Accepter
+              </button>
+              <button
+                type="button"
+                onClick={() => handleIncomingDecision('refuse')}
+                disabled={incomingActionLoading}
+                className="py-2 px-4 border border-slate-600 hover:bg-slate-800 disabled:opacity-60 text-slate-100 rounded-lg transition-colors"
+              >
+                Refuser
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

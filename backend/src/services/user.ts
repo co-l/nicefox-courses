@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express'
 import { getOrCreateUser } from '../db/userQueries.js'
+import { getShareStatus } from './accountShare.js'
 
 /**
  * Middleware to get or create Stock_User from authenticated AuthUser.
@@ -13,8 +14,19 @@ export function stockUserMiddleware(): RequestHandler {
     }
 
     try {
-      const stockUser = await getOrCreateUser(req.authUser.id)
-      req.stockUser = stockUser
+      const actorStockUser = await getOrCreateUser(req.authUser.id, req.authUser.email)
+      const shareStatus = await getShareStatus({
+        actorUserId: actorStockUser.id,
+        actorAuthUserId: req.authUser.id,
+        actorEmail: req.authUser.email ?? '',
+      })
+
+      req.actorStockUser = actorStockUser
+      req.stockUser = {
+        ...actorStockUser,
+        id: shareStatus.effectiveOwnerUserId,
+      }
+
       next()
     } catch (error) {
       console.error('Failed to get/create stock user:', error)

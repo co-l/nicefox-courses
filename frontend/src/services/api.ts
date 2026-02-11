@@ -4,6 +4,8 @@ import type {
   StockItem,
   CreateItemRequest,
   UpdateItemRequest,
+  AccountShare,
+  AccountShareStatusView,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3100/api'
@@ -71,4 +73,32 @@ export async function markItemPurchased(id: string, purchased: boolean): Promise
 
 export async function deleteTemporaryItems(): Promise<void> {
   await api.delete('/items/temporary')
+}
+
+export async function getAccountShareStatus(): Promise<AccountShareStatusView> {
+  const { data } = await api.get('/account-share/status')
+  return data
+}
+
+export async function requestAccountShare(targetEmail: string): Promise<AccountShare> {
+  const { data } = await api.post('/account-share/request', { targetEmail })
+  return data
+}
+
+export async function cancelAccountShareRequest(): Promise<AccountShare> {
+  const { data } = await api.post('/account-share/request/cancel')
+  return data
+}
+
+export async function respondToAccountShare(
+  requestId: string,
+  decision: 'accept' | 'refuse'
+): Promise<AccountShare> {
+  const { data } = await api.post('/account-share/respond', { requestId, decision })
+  return data
+}
+
+export async function stopAccountShare(): Promise<AccountShare> {
+  const { data } = await api.post('/account-share/stop')
+  return data
 }
