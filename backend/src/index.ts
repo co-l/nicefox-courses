@@ -38,16 +38,16 @@ app.use('/api/account-share', authMiddleware({ jwtSecret: config.jwtSecret }), s
 
 // Start server
 async function start() {
-  // Initialize GraphDB
+  // Initialize LeanGraph
   await initDatabase()
   
-  // Test GraphDB connection
+  // Test LeanGraph connection
   const connected = await testConnection()
   if (!connected) {
-    console.error('Failed to connect to GraphDB. Please check your configuration.')
+    console.error('Failed to connect to LeanGraph. Please check your configuration.')
     process.exit(1)
   }
-  console.log('Connected to GraphDB')
+  console.log('Connected to LeanGraph')
 
   app.listen(config.port, () => {
     console.log(`Server running on http://localhost:${config.port}`)
