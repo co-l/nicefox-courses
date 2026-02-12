@@ -2,12 +2,16 @@ import { getDb } from './graphdb.js'
 import { v4 as uuidv4 } from 'uuid'
 import type { StockUser } from '../types/index.js'
 
+export const FIND_USER_BY_AUTH_ID_QUERY = `
+  MATCH (u:Stock_User {authUserId: $authUserId})
+  RETURN u
+  ORDER BY u.createdAt DESC
+  LIMIT 1
+`
+
 export async function findUserByAuthId(authUserId: string): Promise<StockUser | null> {
   const db = getDb()
-  const result = await db.query<{ u: StockUser }>(
-    `MATCH (u:Stock_User {authUserId: $authUserId}) RETURN u`,
-    { authUserId }
-  )
+  const result = await db.query<{ u: StockUser }>(FIND_USER_BY_AUTH_ID_QUERY, { authUserId })
   return result[0]?.u || null
 }
 
