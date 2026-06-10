@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -97,10 +97,25 @@ function SortableShoppingItem({ shoppingItem, onTogglePurchased }: SortableShopp
   )
 }
 
+function buildShoppingItems(items: StockItem[], showAll: boolean): ShoppingItemData[] {
+  const filtered = showAll
+    ? items
+    : items.filter(item => item.currentQuantity < item.targetQuantity)
+  return filtered
+    .sort((a, b) => a.storeOrder - b.storeOrder)
+    .map(item => ({
+      item,
+      toBuy: Math.max(0, item.targetQuantity - item.currentQuantity),
+      purchased: false,
+    }))
+}
+
 export function Shopping() {
   const navigate = useNavigate()
   const [shoppingItems, setShoppingItems] = useState<ShoppingItemData[]>([])
+  const [showAll, setShowAll] = useState(false)
   const [loading, setLoading] = useState(true)
+  const allItemsRef = useRef<StockItem[]>([])
 
   // Touch-optimized sensors
   const sensors = useSensors(
@@ -127,23 +142,20 @@ export function Shopping() {
   async function loadItems() {
     try {
       const items = await getItems()
-      // Build shopping list: items where currentQuantity < targetQuantity
-      // Sort by storeOrder within each store
-      const toBuyItems: ShoppingItemData[] = items
-        .filter(item => item.currentQuantity < item.targetQuantity)
-        .sort((a, b) => a.storeOrder - b.storeOrder)
-        .map(item => ({
-          item,
-          toBuy: item.targetQuantity - item.currentQuantity,
-          purchased: false,
-        }))
-      setShoppingItems(toBuyItems)
+      allItemsRef.current = items
+      setShoppingItems(buildShoppingItems(items, showAll))
     } catch (error) {
       console.error('Failed to load items:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (allItemsRef.current.length > 0) {
+      setShoppingItems(buildShoppingItems(allItemsRef.current, showAll))
+    }
+  }, [showAll])
 
   async function handleTogglePurchased(shoppingItem: ShoppingItemData) {
     const newPurchased = !shoppingItem.purchased
@@ -285,7 +297,19 @@ export function Shopping() {
         </div>
       ) : (
         <>
-          <p className="text-xs text-gray-500 mb-2">Maintenez et glissez pour réordonner</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-500">Maintenez et glissez pour réordonner</p>
+            <button
+              onClick={() => setShowAll(prev => !prev)}
+              className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                showAll
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {showAll ? 'Masquer les articles en stock' : 'Afficher tout'}
+            </button>
+          </div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
